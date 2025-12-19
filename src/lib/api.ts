@@ -18,6 +18,37 @@ export interface EmbeddingCompatibility {
   reason?: string
 }
 
+// Wiki structure types (matching DeepWiki format)
+export interface WikiPage {
+  id: string
+  title: string
+  description?: string
+  importance?: 'high' | 'medium' | 'low'
+  filePaths: string[]
+  relatedPages?: string[]
+}
+
+export interface WikiStructure {
+  title: string
+  description: string
+  pages: WikiPage[]
+}
+
+export interface WikiSource {
+  path: string
+  relevance: number
+}
+
+// Wiki generation event types
+export type WikiEvent =
+  | { type: 'status'; message: string }
+  | { type: 'structure'; wiki: WikiStructure }
+  | { type: 'page_start'; pageId: string; title: string }
+  | { type: 'content'; chunk: string }
+  | { type: 'page_complete'; pageId: string; sources: WikiSource[] }
+  | { type: 'complete' }
+  | { type: 'error'; message: string }
+
 export interface ProjectMetadata {
   owner: string
   repo: string
@@ -374,4 +405,87 @@ export async function* generateReimplementPrompt(owner: string, repo: string): A
       }
     }
   }
+}
+
+// Wiki generation functions
+export type WikiType = 'brief' | 'detailed' | 'dynamic'
+
+async function* generateWikiInternal(
+  owner: string,
+  repo: string,
+  type: WikiType
+): AsyncGenerator<WikiEvent> {
+  const endpoint = `${BASE_URL}/wiki/${type}`
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ owner, repo }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to generate ${type} wiki`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('No response body')
+  }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6)
+
+        if (data === '[DONE]') {
+          return
+        }
+
+        try {
+          const parsed = JSON.parse(data) as WikiEvent
+          yield parsed
+          if (parsed.type === 'complete' || parsed.type === 'error') {
+            return
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+            throw e
+          }
+        }
+      }
+    }
+  }
+}
+
+export async function* generateBriefWiki(
+  owner: string,
+  repo: string
+): AsyncGenerator<WikiEvent> {
+  yield* generateWikiInternal(owner, repo, 'brief')
+}
+
+export async function* generateDetailedWiki(
+  owner: string,
+  repo: string
+): AsyncGenerator<WikiEvent> {
+  yield* generateWikiInternal(owner, repo, 'detailed')
+}
+
+export async function* generateDynamicWiki(
+  owner: string,
+  repo: string
+): AsyncGenerator<WikiEvent> {
+  yield* generateWikiInternal(owner, repo, 'dynamic')
 }

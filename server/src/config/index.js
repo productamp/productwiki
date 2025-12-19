@@ -98,6 +98,9 @@ export const config = {
   llmModel: 'gemini-3-flash-preview',
   maxContextChunks: 100,
 
+  // RAG settings for wiki generation
+  topK: 20, // Number of chunks to retrieve per section query
+
   // Provider selection: 'gemini' or 'ollama'
   llmProvider: process.env.LLM_PROVIDER || 'gemini',
 
