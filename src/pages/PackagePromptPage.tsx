@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
-import { SettingsButton } from '@/components/Settings'
 import { ErrorLog } from '@/components/ErrorLog'
 import { getProject, generatePackagePrompt, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
 import { Loader2, ArrowLeft, Package, Copy, Check } from 'lucide-react'
@@ -107,8 +106,7 @@ export default function PackagePromptPage() {
   if (error && !project) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 relative">
-        <SettingsButton />
-        <p className="text-destructive">{error}</p>
+                <p className="text-destructive">{error}</p>
         <Link to={`/repo/${owner}/${repo}`}>
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -121,8 +119,7 @@ export default function PackagePromptPage() {
 
   return (
     <div className="min-h-screen bg-background p-8 relative">
-      <SettingsButton />
-      <div className="max-w-5xl mx-auto space-y-6">
+            <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link to={`/repo/${owner}/${repo}`}>

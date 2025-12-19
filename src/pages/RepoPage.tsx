@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { SettingsButton } from '@/components/Settings'
 import { ErrorLog } from '@/components/ErrorLog'
+import { IndexingDialog } from '@/components/IndexingDialog'
 import { getProject, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
-import { Loader2, FileText, Layers, Clock, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw } from 'lucide-react'
+import { Loader2, FileText, Layers, Clock, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw } from 'lucide-react'
 
 export default function RepoPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -14,6 +14,7 @@ export default function RepoPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [errors, setErrors] = useState<string[]>([])
+  const [showReindexDialog, setShowReindexDialog] = useState(false)
 
   const loadErrors = async () => {
     try {
@@ -27,6 +28,21 @@ export default function RepoPage() {
   const handleClearErrors = async () => {
     await clearServerLogs()
     setErrors([])
+  }
+
+  const handleReindexComplete = (result: ProjectMetadata) => {
+    setShowReindexDialog(false)
+    setProject(result)
+  }
+
+  const handleReindexCancel = () => {
+    setShowReindexDialog(false)
+  }
+
+  const handleReindexError = (errorMessage: string) => {
+    setShowReindexDialog(false)
+    setError(errorMessage)
+    loadErrors()
   }
 
   useEffect(() => {
@@ -62,8 +78,7 @@ export default function RepoPage() {
   if (error && !project) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 relative">
-        <SettingsButton />
-        <p className="text-destructive">{error}</p>
+                <p className="text-destructive">{error}</p>
         <Link to="/">
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -76,8 +91,7 @@ export default function RepoPage() {
 
   return (
     <div className="min-h-screen bg-background p-8 relative">
-      <SettingsButton />
-      <div className="max-w-5xl mx-auto space-y-6">
+            <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link to="/">
@@ -101,6 +115,16 @@ export default function RepoPage() {
               </a>
             )}
           </div>
+          {project?.url && (
+            <Button
+              variant="outline"
+              onClick={() => setShowReindexDialog(true)}
+              disabled={showReindexDialog}
+            >
+              <RotateCw className="mr-2 h-4 w-4" />
+              Re-index
+            </Button>
+          )}
         </div>
 
         {/* Stats */}
@@ -139,6 +163,11 @@ export default function RepoPage() {
                 <CardTitle className="text-lg">
                   {new Date(project.indexedAt).toLocaleString()}
                 </CardTitle>
+                {project.embedding && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Provider: {project.embedding.provider}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -220,6 +249,17 @@ export default function RepoPage() {
         <div className="fixed bottom-4 right-4 w-96">
           <ErrorLog errors={errors} onClear={handleClearErrors} />
         </div>
+      )}
+
+      {/* Re-index Dialog */}
+      {project?.url && (
+        <IndexingDialog
+          open={showReindexDialog}
+          url={project.url}
+          onComplete={handleReindexComplete}
+          onCancel={handleReindexCancel}
+          onError={handleReindexError}
+        />
       )}
     </div>
   )

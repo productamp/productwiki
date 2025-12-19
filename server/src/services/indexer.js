@@ -3,7 +3,7 @@ import { writeFile } from 'fs/promises';
 import { config } from '../config/index.js';
 import { processRepository } from './repository.js';
 import { storeEmbeddings } from './vectorStore.js';
-import { embedBatch } from '../providers/embeddings.js';
+import { embedBatch, embedBatchWithProgress } from '../providers/index.js';
 
 /**
  * Split text into words
@@ -67,15 +67,28 @@ function chunkDocument(doc) {
 }
 
 /**
- * Index a repository
+ * Index a repository (async generator that yields progress events)
  */
-export async function indexRepository(url, apiKey) {
+export async function* indexRepositoryWithProgress(url, options = {}) {
+  const { signal } = options;
   console.log(`Indexing repository: ${url}`);
 
+  // Check for cancellation
+  if (signal?.aborted) {
+    throw new Error('Indexing cancelled');
+  }
+
   // Clone and read files
+  yield { phase: 'clone', status: 'started' };
   const { owner, repo, files } = await processRepository(url);
+  yield { phase: 'clone', status: 'completed' };
+
+  if (signal?.aborted) {
+    throw new Error('Indexing cancelled');
+  }
 
   console.log(`Found ${files.length} files to index`);
+  yield { phase: 'extract', status: 'completed', fileCount: files.length };
 
   // Chunk all documents
   const allChunks = [];
@@ -85,20 +98,56 @@ export async function indexRepository(url, apiKey) {
   }
 
   console.log(`Created ${allChunks.length} chunks`);
+  yield { phase: 'chunk', status: 'completed', chunkCount: allChunks.length };
 
-  // Embed all chunks in batches
+  if (signal?.aborted) {
+    throw new Error('Indexing cancelled');
+  }
+
+  // Embed all chunks with progress
   const texts = allChunks.map((chunk) => chunk.content);
-  const embeddings = await embedBatch(texts, apiKey);
+  const embeddingGenerator = embedBatchWithProgress(texts, options);
+  let embeddings;
+
+  while (true) {
+    const { done, value } = await embeddingGenerator.next();
+    if (done) {
+      embeddings = value;
+      break;
+    }
+    // Yield embedding progress
+    yield { phase: 'embed', status: 'progress', current: value.current, total: value.total };
+  }
+  yield { phase: 'embed', status: 'completed' };
 
   // Attach embeddings to chunks
   for (let i = 0; i < allChunks.length; i++) {
     allChunks[i].vector = embeddings[i];
   }
 
-  // Store in vector database
-  await storeEmbeddings(owner, repo, allChunks);
+  if (signal?.aborted) {
+    throw new Error('Indexing cancelled');
+  }
 
-  // Save metadata
+  // Store in vector database
+  yield { phase: 'store', status: 'started' };
+  await storeEmbeddings(owner, repo, allChunks);
+  yield { phase: 'store', status: 'completed' };
+
+  // Determine embedding info for metadata
+  const provider = options.provider || config.llmProvider;
+  let embeddingModel;
+  let embeddingDimensions;
+
+  if (provider === 'ollama') {
+    embeddingModel = config.ollamaEmbeddingModel;
+    embeddingDimensions = config.ollamaEmbeddingDimensions;
+  } else {
+    embeddingModel = config.embeddingModel;
+    embeddingDimensions = config.embeddingDimensions;
+  }
+
+  // Save metadata with embedding info
   const metadata = {
     owner,
     repo,
@@ -106,6 +155,11 @@ export async function indexRepository(url, apiKey) {
     indexedAt: new Date().toISOString(),
     fileCount: files.length,
     chunkCount: allChunks.length,
+    embedding: {
+      provider,
+      model: embeddingModel,
+      dimensions: embeddingDimensions,
+    },
   };
 
   const metaPath = join(config.metaDir, `${owner}_${repo}.json`);
@@ -113,5 +167,23 @@ export async function indexRepository(url, apiKey) {
 
   console.log(`Indexing complete for ${owner}/${repo}`);
 
+  yield { phase: 'complete', metadata };
   return metadata;
+}
+
+/**
+ * Index a repository (non-streaming, for backward compatibility)
+ */
+export async function indexRepository(url, options = {}) {
+  const generator = indexRepositoryWithProgress(url, options);
+  let result;
+  // Consume the generator until done
+  while (true) {
+    const { done, value } = await generator.next();
+    if (done) {
+      result = value;
+      break;
+    }
+  }
+  return result;
 }

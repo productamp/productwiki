@@ -19,7 +19,8 @@ export async function generateRoutes(fastify) {
     });
 
     try {
-      for await (const chunk of generateDocumentation(owner, repo, request.apiKey)) {
+      const options = { apiKey: request.apiKey, provider: request.llmProvider, model: request.geminiModel };
+      for await (const chunk of generateDocumentation(owner, repo, options)) {
         const data = JSON.stringify({ content: chunk });
         reply.raw.write(`data: ${data}\n\n`);
       }
@@ -52,7 +53,8 @@ export async function generateRoutes(fastify) {
     });
 
     try {
-      for await (const chunk of generatePackagePrompt(owner, repo, request.apiKey)) {
+      const options = { apiKey: request.apiKey, provider: request.llmProvider, model: request.geminiModel };
+      for await (const chunk of generatePackagePrompt(owner, repo, options)) {
         const data = JSON.stringify({ content: chunk });
         reply.raw.write(`data: ${data}\n\n`);
       }
@@ -85,7 +87,8 @@ export async function generateRoutes(fastify) {
     });
 
     try {
-      for await (const chunk of generateReimplementPrompt(owner, repo, request.apiKey)) {
+      const options = { apiKey: request.apiKey, provider: request.llmProvider, model: request.geminiModel };
+      for await (const chunk of generateReimplementPrompt(owner, repo, options)) {
         const data = JSON.stringify({ content: chunk });
         reply.raw.write(`data: ${data}\n\n`);
       }

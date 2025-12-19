@@ -3,10 +3,9 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
-import { SettingsButton } from '@/components/Settings'
 import { ErrorLog } from '@/components/ErrorLog'
 import { getProject, generateDocs, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
-import { Loader2, ArrowLeft, BookOpen, Copy, Check } from 'lucide-react'
+import { Loader2, ArrowLeft, BookOpen, Copy, Check, AlertTriangle } from 'lucide-react'
 
 export default function DocumentationPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -107,8 +106,7 @@ export default function DocumentationPage() {
   if (error && !project) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 relative">
-        <SettingsButton />
-        <p className="text-destructive">{error}</p>
+                <p className="text-destructive">{error}</p>
         <Link to={`/repo/${owner}/${repo}`}>
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -121,8 +119,7 @@ export default function DocumentationPage() {
 
   return (
     <div className="min-h-screen bg-background p-8 relative">
-      <SettingsButton />
-      <div className="max-w-5xl mx-auto space-y-6">
+            <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link to={`/repo/${owner}/${repo}`}>
@@ -155,6 +152,30 @@ export default function DocumentationPage() {
             </Button>
           )}
         </div>
+
+        {/* Embedding compatibility warning */}
+        {project?.embeddingCompatibility && !project.embeddingCompatibility.compatible && (
+          <Card className="border-yellow-500 bg-yellow-500/10">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                    Embedding Model Mismatch
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {project.embeddingCompatibility.reason} Generation may produce poor results.
+                  </p>
+                  <Link to={`/repo/${owner}/${repo}`} className="inline-block mt-2">
+                    <Button variant="outline" size="sm">
+                      Re-index Repository
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Description */}
         <Card>

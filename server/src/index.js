@@ -22,11 +22,19 @@ await mkdir(config.reposDir, { recursive: true });
 await mkdir(config.vectorsDir, { recursive: true });
 await mkdir(config.metaDir, { recursive: true });
 
-// Extract API key from header and set in process.env for the request
+// Extract API key, provider, and model from headers
 fastify.addHook('preHandler', async (request) => {
   const apiKey = request.headers['x-api-key'];
+  const provider = request.headers['x-llm-provider'];
+  const geminiModel = request.headers['x-gemini-model'];
   if (apiKey) {
     request.apiKey = apiKey;
+  }
+  if (provider) {
+    request.llmProvider = provider;
+  }
+  if (geminiModel) {
+    request.geminiModel = geminiModel;
   }
 });
 
