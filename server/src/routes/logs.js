@@ -1,14 +1,15 @@
+import { Hono } from 'hono';
 import { getErrorLogs, clearErrorLogs } from '../services/errorLog.js';
 
-export async function logsRoutes(fastify) {
-  // Get error logs
-  fastify.get('/logs', async () => {
-    return { logs: getErrorLogs() };
-  });
+export const logsRoutes = new Hono();
 
-  // Clear error logs
-  fastify.delete('/logs', async () => {
-    clearErrorLogs();
-    return { success: true };
-  });
-}
+// Get error logs
+logsRoutes.get('/logs', (c) => {
+  return c.json({ logs: getErrorLogs() });
+});
+
+// Clear error logs
+logsRoutes.delete('/logs', (c) => {
+  clearErrorLogs();
+  return c.json({ success: true });
+});
