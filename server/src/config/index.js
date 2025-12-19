@@ -108,5 +108,5 @@ export const config = {
   ollamaEmbeddingDimensions: 768, // nomic-embed-text default, auto-detected at runtime
 
   // Server
-  port: 3001,
+  port: 3847,
 };

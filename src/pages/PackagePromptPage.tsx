@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
 import { ErrorLog } from '@/components/ErrorLog'
 import { getProject, generatePackagePrompt, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
-import { Loader2, ArrowLeft, Package, Copy, Check } from 'lucide-react'
+import { Loader2, ArrowLeft, Package, Copy, Check, RotateCw } from 'lucide-react'
 
 export default function PackagePromptPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -136,21 +136,28 @@ export default function PackagePromptPage() {
               {owner}/{repo}
             </p>
           </div>
-          {prompt && (
-            <Button onClick={handleCopy} variant="outline">
-              {copied ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Prompt
-                </>
-              )}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {prompt && !generating && (
+              <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
+                <RotateCw className="h-4 w-4" />
+              </Button>
+            )}
+            {prompt && (
+              <Button onClick={handleCopy} variant="outline">
+                {copied ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Prompt
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Description */}
@@ -174,13 +181,6 @@ export default function PackagePromptPage() {
 
         {/* Generated Prompt */}
         {prompt && <DocumentationViewer content={prompt} />}
-
-        {/* Regenerate button */}
-        {prompt && !generating && (
-          <Button onClick={handleGenerate} variant="outline">
-            Regenerate Prompt
-          </Button>
-        )}
 
         {/* Error message */}
         {error && (

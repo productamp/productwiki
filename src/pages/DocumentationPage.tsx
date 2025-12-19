@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
 import { ErrorLog } from '@/components/ErrorLog'
 import { getProject, generateDocs, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
-import { Loader2, ArrowLeft, BookOpen, Copy, Check, AlertTriangle } from 'lucide-react'
+import { Loader2, ArrowLeft, BookOpen, Copy, Check, AlertTriangle, RotateCw } from 'lucide-react'
 
 export default function DocumentationPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -136,21 +136,28 @@ export default function DocumentationPage() {
               {owner}/{repo}
             </p>
           </div>
-          {docs && (
-            <Button onClick={handleCopy} variant="outline">
-              {copied ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy
-                </>
-              )}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {docs && !generating && (
+              <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
+                <RotateCw className="h-4 w-4" />
+              </Button>
+            )}
+            {docs && (
+              <Button onClick={handleCopy} variant="outline">
+                {copied ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Embedding compatibility warning */}
@@ -197,13 +204,6 @@ export default function DocumentationPage() {
 
         {/* Documentation */}
         {docs && <DocumentationViewer content={docs} />}
-
-        {/* Regenerate button */}
-        {docs && !generating && (
-          <Button onClick={handleGenerate} variant="outline">
-            Regenerate Documentation
-          </Button>
-        )}
 
         {/* Error message */}
         {error && (
