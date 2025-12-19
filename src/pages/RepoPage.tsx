@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card'
 import { ErrorLog } from '@/components/ErrorLog'
 import { IndexingDialog } from '@/components/IndexingDialog'
 import { getProject, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
-import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, type LucideIcon } from 'lucide-react'
+import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Zap, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Tool {
@@ -19,10 +19,26 @@ interface Tool {
 
 const tools: Tool[] = [
   {
+    id: 'wiki-brief',
+    name: 'Quick Wiki',
+    icon: Zap,
+    description: 'Generate a brief wiki with overview and quickstart',
+    cacheKey: (o, r) => `wiki_brief_${o}_${r}`,
+    route: (o, r) => `/repo/${o}/${r}/wiki/brief`
+  },
+  {
+    id: 'wiki-detailed',
+    name: 'Full Wiki',
+    icon: FileText,
+    description: 'Generate comprehensive multi-page documentation',
+    cacheKey: (o, r) => `wiki_detailed_${o}_${r}`,
+    route: (o, r) => `/repo/${o}/${r}/wiki/detailed`
+  },
+  {
     id: 'docs',
-    name: 'Documentation',
+    name: 'Documentation (Legacy)',
     icon: BookOpen,
-    description: 'Generate technical documentation for this codebase',
+    description: 'Single-page technical documentation',
     cacheKey: (o, r) => `docs_${o}_${r}`,
     route: (o, r) => `/repo/${o}/${r}/documentation`
   },

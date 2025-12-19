@@ -7,6 +7,7 @@ import { config } from './config/index.js';
 import { indexRoutes } from './routes/index.js';
 import { projectsRoutes } from './routes/projects.js';
 import { generateRoutes } from './routes/generate.js';
+import { wikiRoutes } from './routes/wiki.js';
 import { logsRoutes } from './routes/logs.js';
 import { mkdir } from 'fs/promises';
 
@@ -38,6 +39,7 @@ app.get('/health', (c) => {
 app.route('/', indexRoutes);
 app.route('/', projectsRoutes);
 app.route('/', generateRoutes);
+app.route('/', wikiRoutes);
 app.route('/', logsRoutes);
 
 // Start server
