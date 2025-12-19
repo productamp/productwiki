@@ -1,11 +1,59 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { ErrorLog } from '@/components/ErrorLog'
 import { IndexingDialog } from '@/components/IndexingDialog'
 import { getProject, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
-import { Loader2, FileText, Layers, Clock, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw } from 'lucide-react'
+import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, type LucideIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+interface Tool {
+  id: string
+  name: string
+  icon: LucideIcon
+  description: string
+  cacheKey: (owner: string, repo: string) => string
+  route: (owner: string, repo: string) => string
+}
+
+const tools: Tool[] = [
+  {
+    id: 'docs',
+    name: 'Documentation',
+    icon: BookOpen,
+    description: 'Generate technical documentation for this codebase',
+    cacheKey: (o, r) => `docs_${o}_${r}`,
+    route: (o, r) => `/repo/${o}/${r}/documentation`
+  },
+  {
+    id: 'package',
+    name: 'Package Prompt',
+    icon: Package,
+    description: 'Migrate this SaaS to Electron',
+    cacheKey: (o, r) => `package_prompt_${o}_${r}`,
+    route: (o, r) => `/repo/${o}/${r}/package-prompt`
+  },
+  {
+    id: 'reimplement',
+    name: 'Reimplement',
+    icon: RefreshCw,
+    description: 'Rebuild with React/Vite/shadcn',
+    cacheKey: (o, r) => `reimplement_prompt_${o}_${r}`,
+    route: (o, r) => `/repo/${o}/${r}/reimplement-prompt`
+  },
+]
+
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 export default function RepoPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -15,6 +63,19 @@ export default function RepoPage() {
   const [error, setError] = useState('')
   const [errors, setErrors] = useState<string[]>([])
   const [showReindexDialog, setShowReindexDialog] = useState(false)
+  const [generatedTools, setGeneratedTools] = useState<Set<string>>(new Set())
+
+  const checkGeneratedTools = () => {
+    if (!owner || !repo) return
+    const generated = new Set<string>()
+    for (const tool of tools) {
+      const cached = localStorage.getItem(tool.cacheKey(owner, repo))
+      if (cached) {
+        generated.add(tool.id)
+      }
+    }
+    setGeneratedTools(generated)
+  }
 
   const loadErrors = async () => {
     try {
@@ -61,6 +122,7 @@ export default function RepoPage() {
 
     loadProject()
     loadErrors()
+    checkGeneratedTools()
 
     // Poll for errors every 5 seconds
     const interval = setInterval(loadErrors, 5000)
@@ -78,7 +140,7 @@ export default function RepoPage() {
   if (error && !project) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 relative">
-                <p className="text-destructive">{error}</p>
+        <p className="text-destructive">{error}</p>
         <Link to="/">
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -90,31 +152,28 @@ export default function RepoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8 relative">
-            <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
+    <div className="min-h-screen bg-background relative">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-4">
           <Link to="/">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">
-              {owner}/{repo}
-            </h1>
-            {project?.url && (
-              <a
-                href={project.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:underline flex items-center gap-1"
-              >
+          <h1 className="text-xl font-semibold">
+            {owner}/{repo}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {project?.url && (
+            <a href={project.url} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline">
+                <ExternalLink className="mr-2 h-4 w-4" />
                 View on GitHub
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
+              </Button>
+            </a>
+          )}
           {project?.url && (
             <Button
               variant="outline"
@@ -126,116 +185,59 @@ export default function RepoPage() {
             </Button>
           )}
         </div>
+      </div>
 
-        {/* Stats */}
+      <div className="max-w-4xl mx-auto p-6 space-y-8">
+        {/* Repository Details Card */}
         {project && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <FileText className="h-4 w-4" />
-                  Files Indexed
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CardTitle>{project.fileCount}</CardTitle>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Layers className="h-4 w-4" />
-                  Chunks Created
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CardTitle>{project.chunkCount}</CardTitle>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  Last Indexed
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CardTitle className="text-lg">
-                  {new Date(project.indexedAt).toLocaleString()}
-                </CardTitle>
-                {project.embedding && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Provider: {project.embedding.provider}
-                  </p>
-                )}
-              </CardContent>
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground mb-3">Repository Details</h2>
+            <Card className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+                <span className="font-medium">Indexed</span>
+              </div>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>{project.fileCount} files · {project.chunkCount} chunks · {project.embedding?.provider || 'unknown'}</p>
+                <p>Last indexed {timeAgo(new Date(project.indexedAt))}</p>
+              </div>
             </Card>
           </div>
         )}
 
-        {/* Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                Documentation
-              </CardTitle>
-              <CardDescription>
-                Generate comprehensive technical documentation for this codebase
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={() => navigate(`/repo/${owner}/${repo}/documentation`)}
-                className="w-full"
-              >
-                Generate Docs
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Package Prompt
-              </CardTitle>
-              <CardDescription>
-                Generate a Claude Code prompt to migrate this SaaS to Electron
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={() => navigate(`/repo/${owner}/${repo}/package-prompt`)}
-                variant="outline"
-                className="w-full"
-              >
-                Generate Prompt
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <RefreshCw className="h-5 w-5" />
-                Reimplement Prompt
-              </CardTitle>
-              <CardDescription>
-                Generate a Claude Code prompt to rebuild with React/Vite/shadcn
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={() => navigate(`/repo/${owner}/${repo}/reimplement-prompt`)}
-                variant="outline"
-                className="w-full"
-              >
-                Generate Prompt
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Tools Grid */}
+        <div>
+          <h2 className="text-sm font-medium text-muted-foreground mb-3">Tools</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {tools.map(tool => {
+              const Icon = tool.icon
+              const isGenerated = generatedTools.has(tool.id)
+              return (
+                <Card
+                  key={tool.id}
+                  className={cn(
+                    "p-6 cursor-pointer hover:bg-muted/50 transition-colors",
+                    !isGenerated && "opacity-60"
+                  )}
+                  onClick={() => navigate(tool.route(owner!, repo!))}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <Icon className="h-5 w-5" />
+                    <span className="font-semibold">{tool.name}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {tool.description}
+                  </p>
+                  {isGenerated && (
+                    <div className="flex items-center gap-1 text-sm text-green-600">
+                      <Check className="h-4 w-4" />
+                      Generated
+                    </div>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
         </div>
 
         {/* Error message */}

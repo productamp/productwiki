@@ -1,11 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { IndexingDialog } from '@/components/IndexingDialog'
 import { type ProjectMetadata } from '@/lib/api'
-import { Github } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
 
 interface RepoConnectorProps {
   onIndexComplete?: () => void
@@ -16,6 +14,18 @@ export function RepoConnector({ onIndexComplete }: RepoConnectorProps) {
   const [showIndexingDialog, setShowIndexingDialog] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  // Re-focus input when dialog closes
+  useEffect(() => {
+    if (!showIndexingDialog) {
+      inputRef.current?.focus()
+    }
+  }, [showIndexingDialog])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,35 +74,35 @@ export function RepoConnector({ onIndexComplete }: RepoConnectorProps) {
 
   return (
     <>
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2 text-3xl">
-            <Github className="h-8 w-8" />
-            DeepWiki
-          </CardTitle>
-          <CardDescription>
-            RAG-powered codebase documentation generator
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="w-full text-center space-y-8 py-12">
+        <p className="text-2xl text-foreground font-medium">
+          Which product do you want to document?
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <div className="relative">
             <Input
+              ref={inputRef}
               type="text"
               placeholder="https://github.com/owner/repo"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={showIndexingDialog}
-              className="h-12 text-base"
+              className="h-14 text-base pr-14 rounded-2xl bg-muted/50 border-0 focus-visible:ring-1"
             />
-            <Button type="submit" className="w-full h-12" disabled={showIndexingDialog}>
-              Connect & Index
-            </Button>
-            {error && (
-              <p className="text-sm text-destructive text-center">{error}</p>
-            )}
-          </form>
-        </CardContent>
-      </Card>
+            <button
+              type="submit"
+              disabled={showIndexingDialog || !url.trim()}
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-40"
+            >
+              <ArrowUp className="h-5 w-5" />
+            </button>
+          </div>
+          {error && (
+            <p className="text-sm text-destructive text-center mt-3">{error}</p>
+          )}
+        </form>
+      </div>
 
       <IndexingDialog
         open={showIndexingDialog}

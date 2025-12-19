@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:3001'
+const BASE_URL = 'http://localhost:3847'
 const API_KEY_STORAGE_KEY = 'productwiki_api_key'
 const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider'
 const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model'
