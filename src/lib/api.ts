@@ -46,6 +46,7 @@ export type WikiEvent =
   | { type: 'page_start'; pageId: string; title: string }
   | { type: 'content'; chunk: string }
   | { type: 'page_complete'; pageId: string; sources: WikiSource[] }
+  | { type: 'page_error'; pageId: string; message: string }
   | { type: 'complete' }
   | { type: 'error'; message: string }
 
