@@ -1,106 +1,93 @@
+import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import { generateDocumentation, generatePackagePrompt, generateReimplementPrompt } from '../services/rag.js';
 import { logError } from '../services/errorLog.js';
 
-export async function generateRoutes(fastify) {
-  // Generate documentation (SSE streaming)
-  fastify.post('/generate/docs', async (request, reply) => {
-    const { owner, repo } = request.body;
+export const generateRoutes = new Hono();
 
-    if (!owner || !repo) {
-      return reply.status(400).send({ error: 'Owner and repo are required' });
-    }
+// Generate documentation (SSE streaming)
+generateRoutes.post('/generate/docs', async (c) => {
+  const { owner, repo } = await c.req.json();
 
-    // Set SSE headers
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-    });
+  if (!owner || !repo) {
+    return c.json({ error: 'Owner and repo are required' }, 400);
+  }
 
+  return streamSSE(c, async (stream) => {
     try {
-      const options = { apiKey: request.apiKey, provider: request.llmProvider, model: request.geminiModel };
+      const options = {
+        apiKey: c.get('apiKey'),
+        provider: c.get('llmProvider'),
+        model: c.get('geminiModel'),
+      };
+
       for await (const chunk of generateDocumentation(owner, repo, options)) {
-        const data = JSON.stringify({ content: chunk });
-        reply.raw.write(`data: ${data}\n\n`);
+        await stream.writeSSE({ data: JSON.stringify({ content: chunk }) });
       }
 
-      reply.raw.write('data: [DONE]\n\n');
+      await stream.writeSSE({ data: '[DONE]' });
     } catch (err) {
       logError(`Generate error: ${err.message}`);
-      fastify.log.error(err);
-      const errorData = JSON.stringify({ error: err.message });
-      reply.raw.write(`data: ${errorData}\n\n`);
+      console.error(err);
+      await stream.writeSSE({ data: JSON.stringify({ error: err.message }) });
     }
-
-    reply.raw.end();
   });
+});
 
-  // Generate package/migration prompt (SSE streaming)
-  fastify.post('/generate/package-prompt', async (request, reply) => {
-    const { owner, repo } = request.body;
+// Generate package/migration prompt (SSE streaming)
+generateRoutes.post('/generate/package-prompt', async (c) => {
+  const { owner, repo } = await c.req.json();
 
-    if (!owner || !repo) {
-      return reply.status(400).send({ error: 'Owner and repo are required' });
-    }
+  if (!owner || !repo) {
+    return c.json({ error: 'Owner and repo are required' }, 400);
+  }
 
-    // Set SSE headers
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-    });
-
+  return streamSSE(c, async (stream) => {
     try {
-      const options = { apiKey: request.apiKey, provider: request.llmProvider, model: request.geminiModel };
+      const options = {
+        apiKey: c.get('apiKey'),
+        provider: c.get('llmProvider'),
+        model: c.get('geminiModel'),
+      };
+
       for await (const chunk of generatePackagePrompt(owner, repo, options)) {
-        const data = JSON.stringify({ content: chunk });
-        reply.raw.write(`data: ${data}\n\n`);
+        await stream.writeSSE({ data: JSON.stringify({ content: chunk }) });
       }
 
-      reply.raw.write('data: [DONE]\n\n');
+      await stream.writeSSE({ data: '[DONE]' });
     } catch (err) {
       logError(`Package prompt error: ${err.message}`);
-      fastify.log.error(err);
-      const errorData = JSON.stringify({ error: err.message });
-      reply.raw.write(`data: ${errorData}\n\n`);
+      console.error(err);
+      await stream.writeSSE({ data: JSON.stringify({ error: err.message }) });
     }
-
-    reply.raw.end();
   });
+});
 
-  // Generate reimplement prompt (SSE streaming)
-  fastify.post('/generate/reimplement-prompt', async (request, reply) => {
-    const { owner, repo } = request.body;
+// Generate reimplement prompt (SSE streaming)
+generateRoutes.post('/generate/reimplement-prompt', async (c) => {
+  const { owner, repo } = await c.req.json();
 
-    if (!owner || !repo) {
-      return reply.status(400).send({ error: 'Owner and repo are required' });
-    }
+  if (!owner || !repo) {
+    return c.json({ error: 'Owner and repo are required' }, 400);
+  }
 
-    // Set SSE headers
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-    });
-
+  return streamSSE(c, async (stream) => {
     try {
-      const options = { apiKey: request.apiKey, provider: request.llmProvider, model: request.geminiModel };
+      const options = {
+        apiKey: c.get('apiKey'),
+        provider: c.get('llmProvider'),
+        model: c.get('geminiModel'),
+      };
+
       for await (const chunk of generateReimplementPrompt(owner, repo, options)) {
-        const data = JSON.stringify({ content: chunk });
-        reply.raw.write(`data: ${data}\n\n`);
+        await stream.writeSSE({ data: JSON.stringify({ content: chunk }) });
       }
 
-      reply.raw.write('data: [DONE]\n\n');
+      await stream.writeSSE({ data: '[DONE]' });
     } catch (err) {
       logError(`Reimplement prompt error: ${err.message}`);
-      fastify.log.error(err);
-      const errorData = JSON.stringify({ error: err.message });
-      reply.raw.write(`data: ${errorData}\n\n`);
+      console.error(err);
+      await stream.writeSSE({ data: JSON.stringify({ error: err.message }) });
     }
-
-    reply.raw.end();
   });
-}
+});

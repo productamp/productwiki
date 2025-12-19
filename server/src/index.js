@@ -1,6 +1,8 @@
 import 'dotenv/config';
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
+import { serve } from '@hono/node-server';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { logger } from 'hono/logger';
 import { config } from './config/index.js';
 import { indexRoutes } from './routes/index.js';
 import { projectsRoutes } from './routes/projects.js';
@@ -8,13 +10,18 @@ import { generateRoutes } from './routes/generate.js';
 import { logsRoutes } from './routes/logs.js';
 import { mkdir } from 'fs/promises';
 
-const fastify = Fastify({
-  logger: true,
-});
+const app = new Hono();
 
-// Register CORS
-await fastify.register(cors, {
-  origin: true,
+// Middleware
+app.use('*', logger());
+app.use('*', cors());
+
+// Extract API key, provider, and model from headers into context
+app.use('*', async (c, next) => {
+  c.set('apiKey', c.req.header('x-api-key'));
+  c.set('llmProvider', c.req.header('x-llm-provider'));
+  c.set('geminiModel', c.req.header('x-gemini-model'));
+  await next();
 });
 
 // Ensure data directories exist
@@ -22,38 +29,22 @@ await mkdir(config.reposDir, { recursive: true });
 await mkdir(config.vectorsDir, { recursive: true });
 await mkdir(config.metaDir, { recursive: true });
 
-// Extract API key, provider, and model from headers
-fastify.addHook('preHandler', async (request) => {
-  const apiKey = request.headers['x-api-key'];
-  const provider = request.headers['x-llm-provider'];
-  const geminiModel = request.headers['x-gemini-model'];
-  if (apiKey) {
-    request.apiKey = apiKey;
-  }
-  if (provider) {
-    request.llmProvider = provider;
-  }
-  if (geminiModel) {
-    request.geminiModel = geminiModel;
-  }
-});
-
 // Health check
-fastify.get('/health', async () => {
-  return { status: 'ok', timestamp: new Date().toISOString() };
+app.get('/health', (c) => {
+  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Register routes
-fastify.register(indexRoutes);
-fastify.register(projectsRoutes);
-fastify.register(generateRoutes);
-fastify.register(logsRoutes);
+app.route('/', indexRoutes);
+app.route('/', projectsRoutes);
+app.route('/', generateRoutes);
+app.route('/', logsRoutes);
 
 // Start server
-try {
-  await fastify.listen({ port: config.port, host: '0.0.0.0' });
-  console.log(`Server running at http://localhost:${config.port}`);
-} catch (err) {
-  fastify.log.error(err);
-  process.exit(1);
-}
+serve({
+  fetch: app.fetch,
+  port: config.port,
+  hostname: '0.0.0.0',
+}, (info) => {
+  console.log(`Server running at http://localhost:${info.port}`);
+});

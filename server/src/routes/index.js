@@ -1,43 +1,30 @@
-import { indexRepository, indexRepositoryWithProgress } from '../services/indexer.js';
+import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
+import { indexRepositoryWithProgress } from '../services/indexer.js';
 import { isIndexed } from '../services/vectorStore.js';
 import { logError } from '../services/errorLog.js';
 
-export async function indexRoutes(fastify) {
-  // Trigger indexing with SSE progress stream
-  fastify.post('/index', async (request, reply) => {
-    const { url } = request.body;
+export const indexRoutes = new Hono();
 
-    if (!url) {
-      return reply.status(400).send({ error: 'URL is required' });
-    }
+// Trigger indexing with SSE progress stream
+indexRoutes.post('/index', async (c) => {
+  const { url } = await c.req.json();
 
-    // Set up SSE headers
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-    });
+  if (!url) {
+    return c.json({ error: 'URL is required' }, 400);
+  }
 
-    // Track if client disconnected
-    let aborted = false;
+  return streamSSE(c, async (stream) => {
     const abortSignal = { aborted: false };
 
-    request.raw.on('close', () => {
-      aborted = true;
+    c.req.raw.signal.addEventListener('abort', () => {
       abortSignal.aborted = true;
     });
 
-    const sendEvent = (data) => {
-      if (!aborted) {
-        reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
-      }
-    };
-
     try {
       const options = {
-        apiKey: request.apiKey,
-        provider: request.llmProvider,
+        apiKey: c.get('apiKey'),
+        provider: c.get('llmProvider'),
         signal: abortSignal,
       };
 
@@ -45,39 +32,33 @@ export async function indexRoutes(fastify) {
 
       while (true) {
         const { done, value } = await generator.next();
-        if (done) {
-          break;
-        }
-        sendEvent(value);
+        if (done) break;
+        await stream.writeSSE({ data: JSON.stringify(value) });
       }
 
-      sendEvent({ phase: 'done' });
+      await stream.writeSSE({ data: JSON.stringify({ phase: 'done' }) });
     } catch (err) {
       logError(`Index error: ${err.message}`);
-      fastify.log.error(err);
+      console.error(err);
 
       if (err.message === 'Indexing cancelled') {
-        sendEvent({ phase: 'cancelled' });
+        await stream.writeSSE({ data: JSON.stringify({ phase: 'cancelled' }) });
       } else {
-        sendEvent({ phase: 'error', error: err.message });
+        await stream.writeSSE({ data: JSON.stringify({ phase: 'error', error: err.message }) });
       }
-    } finally {
-      reply.raw.end();
-    }
-
-    return reply;
-  });
-
-  // Check index status
-  fastify.get('/index/status/:owner/:repo', async (request, reply) => {
-    const { owner, repo } = request.params;
-
-    try {
-      const indexed = await isIndexed(owner, repo);
-      return { indexed };
-    } catch (err) {
-      fastify.log.error(err);
-      return reply.status(500).send({ error: err.message });
     }
   });
-}
+});
+
+// Check index status
+indexRoutes.get('/index/status/:owner/:repo', async (c) => {
+  const { owner, repo } = c.req.param();
+
+  try {
+    const indexed = await isIndexed(owner, repo);
+    return c.json({ indexed });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: err.message }, 500);
+  }
+});
