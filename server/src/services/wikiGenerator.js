@@ -3,6 +3,7 @@ import { readFile } from 'fs/promises';
 import { config } from '../config/index.js';
 import { streamChat } from '../providers/index.js';
 import { readRepositoryFiles } from './repository.js';
+import { logError } from './errorLog.js';
 import {
   getStructureGenerationPrompt,
   getPageGenerationPrompt,
@@ -291,7 +292,8 @@ export async function* generateWiki(owner, repo, type = 'detailed', options = {}
         sources = result.value.sources;
       }
     } catch (error) {
-      yield { type: 'content', chunk: `*Error generating page: ${error.message}*` };
+      logError(`Page generation error (${page.title}): ${error.message}`);
+      yield { type: 'page_error', pageId: page.id, message: error.message };
     }
 
     // Signal page complete

@@ -27,9 +27,10 @@ import {
 import { cn } from '@/lib/utils'
 
 interface PageState {
-  status: 'pending' | 'generating' | 'complete'
+  status: 'pending' | 'generating' | 'complete' | 'error'
   content: string
   sources: WikiSource[]
+  error?: string
 }
 
 interface WikiState {
@@ -208,6 +209,19 @@ export default function WikiPage() {
             }))
             break
 
+          case 'page_error':
+            setWikiState(prev => ({
+              ...prev,
+              [event.pageId]: {
+                ...prev[event.pageId],
+                status: 'error',
+                error: event.message,
+              },
+            }))
+            // Refresh error logs so the error shows in the toast
+            loadErrors()
+            break
+
           case 'complete':
             setStatus('')
             break
@@ -383,6 +397,9 @@ export default function WikiPage() {
                     {pageState?.status === 'complete' && (
                       <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                     )}
+                    {pageState?.status === 'error' && (
+                      <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+                    )}
                     {pageState?.status === 'pending' && (
                       <FileText className="h-4 w-4 flex-shrink-0" />
                     )}
@@ -429,6 +446,16 @@ export default function WikiPage() {
                     <div className="h-32 bg-muted/30 rounded animate-pulse" />
                     <div className="h-8 bg-muted/30 rounded animate-pulse w-1/2" />
                     <div className="h-24 bg-muted/30 rounded animate-pulse" />
+                  </div>
+                )}
+
+                {currentPageState?.status === 'error' && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+                    <p className="text-destructive font-medium mb-2">Failed to generate this page</p>
+                    <p className="text-sm text-muted-foreground">
+                      Check the error log for details. You can try regenerating the wiki.
+                    </p>
                   </div>
                 )}
 
