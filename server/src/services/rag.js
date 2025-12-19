@@ -1,6 +1,6 @@
 import { config } from '../config/index.js';
 import { getAllChunks } from './vectorStore.js';
-import { streamChat } from '../providers/llm.js';
+import { streamChat } from '../providers/index.js';
 
 /**
  * Priority order for documentation files
@@ -211,7 +211,7 @@ GUIDELINES FOR THE PROMPT:
 /**
  * Generate reimplement prompt for a repository
  */
-export async function* generateReimplementPrompt(owner, repo, apiKey) {
+export async function* generateReimplementPrompt(owner, repo, options = {}) {
   // Get all chunks
   const chunks = await getAllChunks(owner, repo);
 
@@ -240,7 +240,7 @@ Follow the structure outlined in your instructions.`,
   ];
 
   // Stream response
-  for await (const chunk of streamChat(REIMPLEMENT_PROMPT_SYSTEM, messages, apiKey)) {
+  for await (const chunk of streamChat(REIMPLEMENT_PROMPT_SYSTEM, messages, options)) {
     yield chunk;
   }
 }
@@ -248,7 +248,7 @@ Follow the structure outlined in your instructions.`,
 /**
  * Generate documentation for a repository
  */
-export async function* generateDocumentation(owner, repo, apiKey) {
+export async function* generateDocumentation(owner, repo, options = {}) {
   // Get all chunks
   const chunks = await getAllChunks(owner, repo);
 
@@ -269,7 +269,7 @@ export async function* generateDocumentation(owner, repo, apiKey) {
   ];
 
   // Stream response
-  for await (const chunk of streamChat(SYSTEM_PROMPT, messages, apiKey)) {
+  for await (const chunk of streamChat(SYSTEM_PROMPT, messages, options)) {
     yield chunk;
   }
 }
@@ -277,7 +277,7 @@ export async function* generateDocumentation(owner, repo, apiKey) {
 /**
  * Generate package/migration prompt for a repository
  */
-export async function* generatePackagePrompt(owner, repo, apiKey) {
+export async function* generatePackagePrompt(owner, repo, options = {}) {
   // Get all chunks
   const chunks = await getAllChunks(owner, repo);
 
@@ -298,7 +298,7 @@ export async function* generatePackagePrompt(owner, repo, apiKey) {
   ];
 
   // Stream response
-  for await (const chunk of streamChat(PACKAGE_PROMPT_SYSTEM, messages, apiKey)) {
+  for await (const chunk of streamChat(PACKAGE_PROMPT_SYSTEM, messages, options)) {
     yield chunk;
   }
 }

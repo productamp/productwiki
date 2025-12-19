@@ -98,6 +98,15 @@ export const config = {
   llmModel: 'gemini-3-flash-preview',
   maxContextChunks: 100,
 
+  // Provider selection: 'gemini' or 'ollama'
+  llmProvider: process.env.LLM_PROVIDER || 'gemini',
+
+  // Ollama settings (OLLAMA_HOST is the standard env var used by Ollama CLI)
+  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:11434',
+  ollamaLlmModel: process.env.OLLAMA_LLM_MODEL || 'qwen2.5-coder:3b',
+  ollamaEmbeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
+  ollamaEmbeddingDimensions: 768, // nomic-embed-text default, auto-detected at runtime
+
   // Server
   port: 3001,
 };

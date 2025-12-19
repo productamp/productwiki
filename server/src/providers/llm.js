@@ -5,14 +5,14 @@ import { logError } from '../services/errorLog.js';
 /**
  * Get LLM model for a specific API key and system prompt
  */
-function getClient(apiKey, systemPrompt) {
+function getClient(apiKey, systemPrompt, model) {
   const key = apiKey || process.env.GOOGLE_API_KEY;
   if (!key) {
     throw new Error('Google API key is required. Set it in Settings or GOOGLE_API_KEY environment variable.');
   }
   const genAI = new GoogleGenerativeAI(key);
   return genAI.getGenerativeModel({
-    model: config.llmModel,
+    model: model || config.llmModel,
     systemInstruction: {
       parts: [{ text: systemPrompt }],
     },
@@ -22,8 +22,8 @@ function getClient(apiKey, systemPrompt) {
 /**
  * Stream chat completion
  */
-export async function* streamChat(systemPrompt, messages, apiKey) {
-  const llm = getClient(apiKey, systemPrompt);
+export async function* streamChat(systemPrompt, messages, apiKey, model) {
+  const llm = getClient(apiKey, systemPrompt, model);
 
   // Convert messages to Gemini format
   const history = messages.slice(0, -1).map((msg) => ({

@@ -24,14 +24,19 @@ export async function embed(text, apiKey) {
 }
 
 /**
- * Embed multiple texts in batches
+ * Embed multiple texts in batches (async generator with progress)
  */
-export async function embedBatch(texts, apiKey) {
+export async function* embedBatchWithProgress(texts, apiKey, signal) {
   const model = getClient(apiKey);
   const embeddings = [];
 
   // Process in batches
   for (let i = 0; i < texts.length; i += config.embeddingBatchSize) {
+    // Check for cancellation
+    if (signal?.aborted) {
+      throw new Error('Indexing cancelled');
+    }
+
     const batch = texts.slice(i, i + config.embeddingBatchSize);
     console.log(`Embedding batch ${Math.floor(i / config.embeddingBatchSize) + 1}/${Math.ceil(texts.length / config.embeddingBatchSize)}`);
 
@@ -51,7 +56,27 @@ export async function embedBatch(texts, apiKey) {
     );
 
     embeddings.push(...batchResults);
+
+    // Yield progress after each batch
+    yield { current: Math.min(i + config.embeddingBatchSize, texts.length), total: texts.length };
   }
 
   return embeddings;
+}
+
+/**
+ * Embed multiple texts in batches
+ */
+export async function embedBatch(texts, apiKey) {
+  const generator = embedBatchWithProgress(texts, apiKey);
+  let result;
+  // Consume the generator until done
+  while (true) {
+    const { done, value } = await generator.next();
+    if (done) {
+      result = value;
+      break;
+    }
+  }
+  return result;
 }

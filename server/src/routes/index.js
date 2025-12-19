@@ -1,9 +1,9 @@
-import { indexRepository } from '../services/indexer.js';
+import { indexRepository, indexRepositoryWithProgress } from '../services/indexer.js';
 import { isIndexed } from '../services/vectorStore.js';
 import { logError } from '../services/errorLog.js';
 
 export async function indexRoutes(fastify) {
-  // Trigger indexing
+  // Trigger indexing with SSE progress stream
   fastify.post('/index', async (request, reply) => {
     const { url } = request.body;
 
@@ -11,14 +11,61 @@ export async function indexRoutes(fastify) {
       return reply.status(400).send({ error: 'URL is required' });
     }
 
+    // Set up SSE headers
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+
+    // Track if client disconnected
+    let aborted = false;
+    const abortSignal = { aborted: false };
+
+    request.raw.on('close', () => {
+      aborted = true;
+      abortSignal.aborted = true;
+    });
+
+    const sendEvent = (data) => {
+      if (!aborted) {
+        reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+      }
+    };
+
     try {
-      const result = await indexRepository(url, request.apiKey);
-      return result;
+      const options = {
+        apiKey: request.apiKey,
+        provider: request.llmProvider,
+        signal: abortSignal,
+      };
+
+      const generator = indexRepositoryWithProgress(url, options);
+
+      while (true) {
+        const { done, value } = await generator.next();
+        if (done) {
+          break;
+        }
+        sendEvent(value);
+      }
+
+      sendEvent({ phase: 'done' });
     } catch (err) {
       logError(`Index error: ${err.message}`);
       fastify.log.error(err);
-      return reply.status(500).send({ error: err.message });
+
+      if (err.message === 'Indexing cancelled') {
+        sendEvent({ phase: 'cancelled' });
+      } else {
+        sendEvent({ phase: 'error', error: err.message });
+      }
+    } finally {
+      reply.raw.end();
     }
+
+    return reply;
   });
 
   // Check index status
