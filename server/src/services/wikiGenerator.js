@@ -9,6 +9,9 @@ import {
   getPageGenerationPrompt,
   briefWikiTemplate,
   detailedWikiTemplate,
+  productDocsTemplate,
+  getProductDocsStructurePrompt,
+  getProductDocsPagePrompt,
 } from '../templates/wikiStructure.js';
 
 /**
@@ -124,6 +127,57 @@ async function generateWikiStructure(owner, repo, repoPath, isComprehensive, opt
 }
 
 /**
+ * Generate product documentation structure using LLM
+ * Phase 1: Analyze file tree + README to determine user-focused documentation structure
+ */
+async function generateProductDocsStructure(owner, repo, repoPath, options = {}) {
+  const fileTree = await getFileTree(repoPath);
+  const readme = await getReadmeContent(repoPath);
+
+  const prompt = getProductDocsStructurePrompt(owner, repo, fileTree, readme);
+
+  const messages = [
+    {
+      role: 'user',
+      content: prompt,
+    },
+  ];
+
+  let structureJson = '';
+  for await (const chunk of streamChat('You are a product documentation expert focused on end-user experience.', messages, options)) {
+    structureJson += chunk;
+  }
+
+  // Clean up potential markdown code blocks
+  structureJson = structureJson.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+  // Try to parse
+  try {
+    const structure = JSON.parse(structureJson);
+
+    // Validate required fields
+    if (!structure.title || !structure.pages || !Array.isArray(structure.pages)) {
+      throw new Error('Invalid structure format');
+    }
+
+    // Ensure each page has required fields
+    for (const page of structure.pages) {
+      page.id = page.id || `page-${structure.pages.indexOf(page) + 1}`;
+      page.title = page.title || 'Untitled';
+      page.filePaths = page.filePaths || [];
+      page.relatedPages = page.relatedPages || [];
+      page.importance = page.importance || 'medium';
+    }
+
+    return structure;
+  } catch (e) {
+    console.error('Failed to parse product docs structure:', e.message);
+    console.error('Raw response:', structureJson.slice(0, 500));
+    throw new Error(`Failed to parse product docs structure: ${e.message}`);
+  }
+}
+
+/**
  * Get wiki structure (LLM-generated or template fallback)
  */
 async function getWikiStructure(owner, repo, repoPath, type, options = {}) {
@@ -185,6 +239,77 @@ async function getWikiStructure(owner, repo, repoPath, type, options = {}) {
 }
 
 /**
+ * Get product documentation structure (LLM-generated or template fallback)
+ */
+async function getProductDocsStructure(owner, repo, repoPath, options = {}) {
+  try {
+    // Try LLM-generated structure
+    const structure = await generateProductDocsStructure(owner, repo, repoPath, options);
+    return structure;
+  } catch (error) {
+    console.warn('LLM product docs structure generation failed, using template fallback:', error.message);
+
+    // Fallback to template
+    const template = JSON.parse(JSON.stringify(productDocsTemplate));
+
+    template.title = `${owner}/${repo} - User Guide`;
+    template.description = `User documentation for ${owner}/${repo}`;
+
+    // Populate file paths from repository - focus on user-facing files
+    const files = await readRepositoryFiles(repoPath);
+    const allPaths = files.map(f => f.path);
+
+    // Heuristic to assign files to pages based on feature areas
+    for (const page of template.pages) {
+      if (page.id === 'overview') {
+        page.filePaths = allPaths.filter(p =>
+          p.toLowerCase().includes('readme') ||
+          p.includes('package.json') ||
+          p.includes('index.')
+        ).slice(0, 5);
+      } else if (page.id === 'quick-start') {
+        page.filePaths = allPaths.filter(p =>
+          p.toLowerCase().includes('readme') ||
+          p.includes('config') ||
+          p.includes('setup') ||
+          p.includes('index.')
+        ).slice(0, 5);
+      } else if (page.id === 'features') {
+        // Look for main feature implementations
+        page.filePaths = allPaths.filter(p =>
+          p.includes('components/') ||
+          p.includes('pages/') ||
+          p.includes('features/') ||
+          p.includes('views/') ||
+          p.includes('services/')
+        ).slice(0, 8);
+      } else if (page.id === 'settings') {
+        // Look for config, settings
+        page.filePaths = allPaths.filter(p =>
+          p.includes('config') ||
+          p.includes('settings') ||
+          p.includes('preferences') ||
+          p.includes('options')
+        ).slice(0, 6);
+      } else if (page.id === 'faq' || page.id === 'troubleshooting') {
+        // Look for error handling, common patterns
+        page.filePaths = allPaths.filter(p =>
+          p.includes('error') ||
+          p.includes('utils') ||
+          p.toLowerCase().includes('readme') ||
+          p.includes('constants')
+        ).slice(0, 5);
+      } else {
+        // Default: assign some files
+        page.filePaths = allPaths.slice(0, 5);
+      }
+    }
+
+    return template;
+  }
+}
+
+/**
  * Generate content for a single wiki page
  * Phase 2: Read relevant files and generate comprehensive documentation
  */
@@ -228,6 +353,55 @@ Generate the wiki page content now.`;
   const sources = files.map(f => ({
     path: f.path,
     relevance: 1.0, // All files are explicitly requested, so relevance is 1.0
+  }));
+
+  return { sources };
+}
+
+/**
+ * Generate content for a single product documentation page
+ * Phase 2: Read relevant files and generate user-focused documentation
+ */
+async function* generateProductDocsPageContent(repoPath, page, productName, options = {}) {
+  // Read the relevant files
+  const files = await readFilesContent(repoPath, page.filePaths);
+
+  if (files.length === 0) {
+    yield {
+      type: 'content',
+      chunk: `*No relevant files found for this page. Files searched: ${page.filePaths.join(', ')}*`,
+    };
+    return { sources: [] };
+  }
+
+  // Build context from files
+  const context = buildFileContext(files);
+
+  // Generate page prompt using product docs prompt
+  const userPrompt = `${getProductDocsPagePrompt(page.title, page.filePaths, productName)}
+
+Here is the content of the relevant source files. Extract the USER-FACING information from these files:
+
+${context}
+
+Generate the product documentation page content now. Remember to focus on the END USER perspective.`;
+
+  const messages = [
+    {
+      role: 'user',
+      content: userPrompt,
+    },
+  ];
+
+  // Stream the response
+  for await (const chunk of streamChat('', messages, options)) {
+    yield { type: 'content', chunk };
+  }
+
+  // Return sources (the files we used)
+  const sources = files.map(f => ({
+    path: f.path,
+    relevance: 1.0,
   }));
 
   return { sources };
@@ -320,4 +494,79 @@ export async function* generateBriefWiki(owner, repo, options = {}) {
  */
 export async function* generateDetailedWiki(owner, repo, options = {}) {
   yield* generateWiki(owner, repo, 'detailed', options);
+}
+
+/**
+ * Generate product documentation with streaming events
+ * Focused on end-user perspective, functionality, and features
+ *
+ * Yields events in this order:
+ * 1. { type: 'status', message: '...' }
+ * 2. { type: 'structure', wiki: {...} }
+ * 3. For each page:
+ *    - { type: 'page_start', pageId, title }
+ *    - { type: 'content', chunk: '...' } (multiple)
+ *    - { type: 'page_complete', pageId, sources: [...] }
+ * 4. { type: 'complete' }
+ */
+export async function* generateProductDocs(owner, repo, options = {}) {
+  const repoPath = join(config.reposDir, owner, repo);
+
+  // Phase 1: Get/Generate structure
+  yield { type: 'status', message: 'Analyzing product features and functionality...' };
+
+  let structure;
+  try {
+    structure = await getProductDocsStructure(owner, repo, repoPath, options);
+  } catch (error) {
+    yield { type: 'error', message: error.message };
+    return;
+  }
+
+  // Send structure to frontend
+  yield { type: 'structure', wiki: structure };
+
+  yield { type: 'status', message: 'Generating user documentation...' };
+
+  // Phase 2: Generate content for each page
+  for (const page of structure.pages) {
+    // Signal page start
+    yield {
+      type: 'page_start',
+      pageId: page.id,
+      title: page.title,
+    };
+
+    yield { type: 'status', message: `Generating: ${page.title}...` };
+
+    // Generate page content
+    let sources = [];
+    try {
+      const generator = generateProductDocsPageContent(repoPath, page, structure.title, options);
+      let result = await generator.next();
+
+      while (!result.done) {
+        yield result.value;
+        result = await generator.next();
+      }
+
+      // Get sources from return value
+      if (result.value && result.value.sources) {
+        sources = result.value.sources;
+      }
+    } catch (error) {
+      logError(`Product docs page generation error (${page.title}): ${error.message}`);
+      yield { type: 'page_error', pageId: page.id, message: error.message };
+    }
+
+    // Signal page complete
+    yield {
+      type: 'page_complete',
+      pageId: page.id,
+      sources,
+    };
+  }
+
+  // Signal complete
+  yield { type: 'complete' };
 }
