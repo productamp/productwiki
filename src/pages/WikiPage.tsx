@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErrorLog } from '@/components/ErrorLog'
-import ReactMarkdown from 'react-markdown'
+import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import {
   getProject,
   generateBriefWiki,
@@ -460,11 +460,10 @@ export default function WikiPage() {
                 )}
 
                 {(currentPageState?.status === 'generating' || currentPageState?.status === 'complete') && (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>
-                      {currentPageState.content || ''}
-                    </ReactMarkdown>
-                  </div>
+                  <MarkdownRenderer
+                    content={currentPageState.content || ''}
+                    className="prose-sm"
+                  />
                 )}
 
                 {/* Sources */}
