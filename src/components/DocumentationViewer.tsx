@@ -1,5 +1,5 @@
-import ReactMarkdown from 'react-markdown'
 import { Card, CardContent } from '@/components/ui/card'
+import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 
 interface DocumentationViewerProps {
   content: string
@@ -9,9 +9,7 @@ export function DocumentationViewer({ content }: DocumentationViewerProps) {
   return (
     <Card className="w-full">
       <CardContent className="pt-6">
-        <div className="prose dark:prose-invert max-w-none">
-          <ReactMarkdown>{content}</ReactMarkdown>
-        </div>
+        <MarkdownRenderer content={content} />
       </CardContent>
     </Card>
   )
