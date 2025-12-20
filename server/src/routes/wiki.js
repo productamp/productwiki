@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { generateWiki, generateBriefWiki, generateDetailedWiki } from '../services/wikiGenerator.js';
+import { generateWiki, generateBriefWiki, generateDetailedWiki, generateProductDocs } from '../services/wikiGenerator.js';
 import { logError } from '../services/errorLog.js';
 
 export const wikiRoutes = new Hono();
@@ -95,6 +95,38 @@ wikiRoutes.post('/wiki/dynamic', async (c) => {
       await stream.writeSSE({ data: '[DONE]' });
     } catch (err) {
       logError(`Dynamic wiki generation error: ${err.message}`);
+      console.error(err);
+      await stream.writeSSE({ data: JSON.stringify({ type: 'error', message: err.message }) });
+    }
+  });
+});
+
+/**
+ * Generate product documentation (SSE streaming)
+ * End-user focused documentation emphasizing functionality and features
+ */
+wikiRoutes.post('/wiki/product-docs', async (c) => {
+  const { owner, repo } = await c.req.json();
+
+  if (!owner || !repo) {
+    return c.json({ error: 'Owner and repo are required' }, 400);
+  }
+
+  return streamSSE(c, async (stream) => {
+    try {
+      const options = {
+        apiKey: c.get('apiKey'),
+        provider: c.get('llmProvider'),
+        model: c.get('geminiModel'),
+      };
+
+      for await (const event of generateProductDocs(owner, repo, options)) {
+        await stream.writeSSE({ data: JSON.stringify(event) });
+      }
+
+      await stream.writeSSE({ data: '[DONE]' });
+    } catch (err) {
+      logError(`Product documentation generation error: ${err.message}`);
       console.error(err);
       await stream.writeSSE({ data: JSON.stringify({ type: 'error', message: err.message }) });
     }

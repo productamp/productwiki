@@ -232,3 +232,203 @@ export const detailedWikiTemplate = {
     },
   ],
 };
+
+/**
+ * Product Documentation template - Traditional product documentation style
+ * Matches the format of professional help centers and product guides
+ */
+export const productDocsTemplate = {
+  title: '',
+  description: '',
+  pages: [
+    {
+      id: 'overview',
+      title: 'Product Overview',
+      description: 'What this product is and its key capabilities',
+      importance: 'high',
+      filePaths: [],
+      relatedPages: ['quick-start'],
+    },
+    {
+      id: 'quick-start',
+      title: 'Quick Start',
+      description: 'Get up and running in minutes',
+      importance: 'high',
+      filePaths: [],
+      relatedPages: ['overview', 'features'],
+    },
+    {
+      id: 'features',
+      title: 'Features',
+      description: 'Complete guide to product features',
+      importance: 'high',
+      filePaths: [],
+      relatedPages: ['quick-start', 'settings'],
+    },
+    {
+      id: 'settings',
+      title: 'Settings & Configuration',
+      description: 'Customize the product to your needs',
+      importance: 'medium',
+      filePaths: [],
+      relatedPages: ['features'],
+    },
+    {
+      id: 'faq',
+      title: 'FAQ',
+      description: 'Frequently asked questions',
+      importance: 'medium',
+      filePaths: [],
+      relatedPages: ['troubleshooting'],
+    },
+    {
+      id: 'troubleshooting',
+      title: 'Troubleshooting',
+      description: 'Solutions to common problems',
+      importance: 'medium',
+      filePaths: [],
+      relatedPages: ['faq'],
+    },
+  ],
+};
+
+/**
+ * System prompt for Product Documentation structure generation
+ * Creates traditional product documentation like Notion, Stripe, or Slack help centers
+ */
+export function getProductDocsStructurePrompt(owner, repo, fileTree, readme) {
+  return `You are creating the documentation structure for a product help center, similar to what companies like Notion, Stripe, Slack, or Figma publish for their users.
+
+Analyze this software product ${owner}/${repo}:
+
+1. The complete file tree of the project:
+<file_tree>
+${fileTree}
+</file_tree>
+
+2. The README file of the project:
+<readme>
+${readme}
+</readme>
+
+Create a documentation structure following the conventions of professional product documentation:
+
+DOCUMENTATION STYLE GUIDELINES:
+- Use noun-based page titles (e.g., "Workspaces", "Billing", "Integrations") not action verbs
+- Each page should be a reference page about a concept, feature area, or capability
+- Structure should mirror how the product is organized, not how tasks are performed
+- If this is a developer tool/library, the users ARE developers - document it as product docs for developers
+
+STANDARD SECTIONS TO CONSIDER:
+- Product Overview / Introduction
+- Quick Start / Getting Started
+- Core Concepts (explain key terminology and mental models)
+- Feature pages (one page per major feature area)
+- Settings & Configuration
+- Integrations (if applicable)
+- Billing & Plans (if applicable)
+- FAQ
+- Troubleshooting
+
+Return your analysis in the following JSON format:
+
+{
+  "title": "Product Name Documentation",
+  "description": "Official documentation for [product name]",
+  "pages": [
+    {
+      "id": "page-id",
+      "title": "Page Title",
+      "description": "What this page covers",
+      "importance": "high|medium|low",
+      "filePaths": ["path/to/relevant/file1.js", "path/to/relevant/file2.ts"],
+      "relatedPages": ["other-page-id"]
+    }
+  ]
+}
+
+REQUIREMENTS:
+1. Create 6-10 pages covering the product comprehensively
+2. Use professional, noun-based titles (e.g., "Dashboard", "User Management", "API Keys" - NOT "Managing Users" or "Setting Up API Keys")
+3. The filePaths should reference files containing the feature's implementation
+4. Each page should have 3-8 relevant files listed in filePaths
+5. Return ONLY valid JSON, no markdown code blocks or explanation
+6. Start directly with { and end with }`;
+}
+
+/**
+ * System prompt for Product Documentation page content generation
+ * Creates traditional product documentation in the style of professional help centers
+ */
+export function getProductDocsPagePrompt(pageTitle, filePaths, productName) {
+  const filePathsList = filePaths.map(path => `- ${path}`).join('\n');
+
+  return `You are writing product documentation for "${productName}", specifically the "${pageTitle}" page.
+
+Write in the style of professional product documentation like Notion Help, Stripe Docs, or Slack Help Center. This is reference documentation, not a tutorial.
+
+You will analyze source files to understand the feature, then document it for end users.
+
+FORMAT REQUIREMENTS:
+
+Start with a \`<details>\` block listing source files:
+<details>
+<summary>Source files</summary>
+
+${filePathsList}
+</details>
+
+Then the page title: \`# ${pageTitle}\`
+
+CONTENT STRUCTURE:
+
+1. **Overview** (1-2 paragraphs)
+   - What this feature/area is
+   - Why it exists and when you'd use it
+
+2. **Key Concepts** (if applicable)
+   - Define any terminology specific to this feature
+   - Explain the mental model users need
+
+3. **Feature Documentation**
+   For each capability within this area:
+   - **What it is** - Brief description
+   - **How it works** - Explain the behavior
+   - **Options/Settings** - Document available configurations
+
+4. **Reference Tables** (where applicable)
+   Use tables for:
+   | Setting | Description | Default |
+   | Option | Effect |
+   | Field | Type | Required |
+
+5. **Examples** (if helpful)
+   - Show typical configurations
+   - Illustrate common patterns
+
+6. **Diagrams** (use sparingly, only when they add clarity)
+   - Use \`graph TD\` (top-down) for any Mermaid diagrams
+   - Keep node labels short (2-4 words)
+   - Only include if the concept genuinely benefits from visualization
+
+7. **Related Pages**
+   - Link to related documentation sections
+
+WRITING STYLE:
+
+- Professional, neutral tone (like Stripe or GitHub docs)
+- Present tense ("The dashboard shows..." not "The dashboard will show...")
+- Second person sparingly ("you can configure..." is fine, but don't overuse)
+- Factual and precise - avoid marketing language
+- Structure information for scanning (headers, bullets, tables)
+- Be comprehensive but concise
+
+DO NOT:
+- Write like a tutorial with numbered steps for everything
+- Use overly casual or enthusiastic language
+- Add unnecessary encouragement or praise
+- Explain internal implementation details
+- Include information not supported by the source files
+
+Extract the user-facing functionality from the code and document it as a professional reference.`;
+}

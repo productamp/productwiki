@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card'
 import { ErrorLog } from '@/components/ErrorLog'
 import { IndexingDialog } from '@/components/IndexingDialog'
 import { getProject, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
-import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Zap, type LucideIcon } from 'lucide-react'
+import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Zap, Users, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Tool {
@@ -33,6 +33,14 @@ const tools: Tool[] = [
     description: 'Generate comprehensive multi-page documentation',
     cacheKey: (o, r) => `wiki_detailed_${o}_${r}`,
     route: (o, r) => `/repo/${o}/${r}/wiki/detailed`
+  },
+  {
+    id: 'product-docs',
+    name: 'Product Docs',
+    icon: Users,
+    description: 'End-user focused documentation with features and workflows',
+    cacheKey: (o, r) => `product_docs_${o}_${r}`,
+    route: (o, r) => `/repo/${o}/${r}/product-docs`
   },
   {
     id: 'docs',

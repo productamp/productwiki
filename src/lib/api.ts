@@ -409,7 +409,7 @@ export async function* generateReimplementPrompt(owner: string, repo: string): A
 }
 
 // Wiki generation functions
-export type WikiType = 'brief' | 'detailed' | 'dynamic'
+export type WikiType = 'brief' | 'detailed' | 'dynamic' | 'product-docs'
 
 async function* generateWikiInternal(
   owner: string,
@@ -489,4 +489,11 @@ export async function* generateDynamicWiki(
   repo: string
 ): AsyncGenerator<WikiEvent> {
   yield* generateWikiInternal(owner, repo, 'dynamic')
+}
+
+export async function* generateProductDocs(
+  owner: string,
+  repo: string
+): AsyncGenerator<WikiEvent> {
+  yield* generateWikiInternal(owner, repo, 'product-docs')
 }
