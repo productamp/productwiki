@@ -1,9 +1,7 @@
-import { join } from 'path';
-import { readFile } from 'fs/promises';
 import { config } from '../config/index.js';
 import { streamChat } from '../providers/index.js';
-import { readRepositoryFiles } from './repository.js';
-import { queryRag, buildRagContext, isIndexed } from './ragQuery.js';
+import { fetchRepositoryFiles, fetchReadmeContent } from './repository.js';
+import { queryRag, buildRagContext, isIndexed, getProjectMetadata } from './ragQuery.js';
 import { logError } from './errorLog.js';
 import {
   getStructureGenerationPrompt,
@@ -16,30 +14,19 @@ import {
 } from '../templates/wikiStructure.js';
 
 /**
- * Get the file tree of a repository as a string
+ * Get the file tree of a repository as a string using GitHub API
  */
-async function getFileTree(repoPath) {
-  const files = await readRepositoryFiles(repoPath);
+async function getFileTree(owner, repo, branch) {
+  const { files } = await fetchRepositoryFiles(owner, repo, config);
   const paths = files.map(f => f.path).sort();
-  return paths.join('\n');
+  return { fileTree: paths.join('\n'), files };
 }
 
 /**
- * Get the README content from a repository
+ * Get the README content from a repository using GitHub API
  */
-async function getReadmeContent(repoPath) {
-  const readmeNames = ['README.md', 'readme.md', 'README.MD', 'README', 'readme.txt', 'README.txt'];
-
-  for (const name of readmeNames) {
-    try {
-      const content = await readFile(join(repoPath, name), 'utf-8');
-      return content;
-    } catch {
-      // Try next name
-    }
-  }
-
-  return 'No README found.';
+async function getReadmeContent(owner, repo, branch) {
+  return fetchReadmeContent(owner, repo, branch);
 }
 
 /**
@@ -70,9 +57,10 @@ const MAX_README_CHARS = 8000;
  * Generate wiki structure using LLM
  * Phase 1: Analyze file tree + README to determine optimal wiki structure
  */
-async function generateWikiStructure(owner, repo, repoPath, isComprehensive, options = {}) {
-  let fileTree = await getFileTree(repoPath);
-  let readme = await getReadmeContent(repoPath);
+async function generateWikiStructure(owner, repo, branch, isComprehensive, options = {}) {
+  const { fileTree: rawFileTree, files } = await getFileTree(owner, repo, branch);
+  let fileTree = rawFileTree;
+  let readme = await getReadmeContent(owner, repo, branch);
 
   // Truncate if too long to prevent rate limits
   if (fileTree.length > MAX_FILE_TREE_CHARS) {
@@ -132,9 +120,10 @@ async function generateWikiStructure(owner, repo, repoPath, isComprehensive, opt
  * Generate product documentation structure using LLM
  * Phase 1: Analyze file tree + README to determine user-focused documentation structure
  */
-async function generateProductDocsStructure(owner, repo, repoPath, options = {}) {
-  let fileTree = await getFileTree(repoPath);
-  let readme = await getReadmeContent(repoPath);
+async function generateProductDocsStructure(owner, repo, branch, options = {}) {
+  const { fileTree: rawFileTree, files } = await getFileTree(owner, repo, branch);
+  let fileTree = rawFileTree;
+  let readme = await getReadmeContent(owner, repo, branch);
 
   // Truncate if too long to prevent rate limits
   if (fileTree.length > MAX_FILE_TREE_CHARS) {
@@ -193,12 +182,12 @@ async function generateProductDocsStructure(owner, repo, repoPath, options = {})
 /**
  * Get wiki structure (LLM-generated or template fallback)
  */
-async function getWikiStructure(owner, repo, repoPath, type, options = {}) {
+async function getWikiStructure(owner, repo, branch, type, options = {}) {
   const isComprehensive = type === 'detailed';
 
   try {
     // Try LLM-generated structure
-    const structure = await generateWikiStructure(owner, repo, repoPath, isComprehensive, options);
+    const structure = await generateWikiStructure(owner, repo, branch, isComprehensive, options);
     return structure;
   } catch (error) {
     console.warn('LLM structure generation failed, using template fallback:', error.message);
@@ -211,8 +200,8 @@ async function getWikiStructure(owner, repo, repoPath, type, options = {}) {
     template.title = `${owner}/${repo}`;
     template.description = `Documentation for ${owner}/${repo}`;
 
-    // Populate file paths from repository
-    const files = await readRepositoryFiles(repoPath);
+    // Populate file paths from repository via GitHub API
+    const { files } = await fetchRepositoryFiles(owner, repo, config);
     const allPaths = files.map(f => f.path);
 
     // Simple heuristic to assign files to pages
@@ -254,10 +243,10 @@ async function getWikiStructure(owner, repo, repoPath, type, options = {}) {
 /**
  * Get product documentation structure (LLM-generated or template fallback)
  */
-async function getProductDocsStructure(owner, repo, repoPath, options = {}) {
+async function getProductDocsStructure(owner, repo, branch, options = {}) {
   try {
     // Try LLM-generated structure
-    const structure = await generateProductDocsStructure(owner, repo, repoPath, options);
+    const structure = await generateProductDocsStructure(owner, repo, branch, options);
     return structure;
   } catch (error) {
     console.warn('LLM product docs structure generation failed, using template fallback:', error.message);
@@ -268,8 +257,8 @@ async function getProductDocsStructure(owner, repo, repoPath, options = {}) {
     template.title = `${owner}/${repo} - User Guide`;
     template.description = `User documentation for ${owner}/${repo}`;
 
-    // Populate file paths from repository - focus on user-facing files
-    const files = await readRepositoryFiles(repoPath);
+    // Populate file paths from repository via GitHub API - focus on user-facing files
+    const { files } = await fetchRepositoryFiles(owner, repo, config);
     const allPaths = files.map(f => f.path);
 
     // Heuristic to assign files to pages based on feature areas
@@ -455,7 +444,6 @@ Generate the product documentation page content now. Remember to focus on the EN
  * 4. { type: 'complete' }
  */
 export async function* generateWiki(owner, repo, type = 'detailed', options = {}) {
-  const repoPath = join(config.reposDir, owner, repo);
   const repoUrl = `https://github.com/${owner}/${repo}`;
 
   // Check if repository is indexed (required for RAG)
@@ -465,12 +453,16 @@ export async function* generateWiki(owner, repo, type = 'detailed', options = {}
     return;
   }
 
+  // Get metadata to find the branch
+  const metadata = await getProjectMetadata(owner, repo);
+  const branch = metadata?.branch || 'main';
+
   // Phase 1: Get/Generate structure
   yield { type: 'status', message: 'Analyzing codebase structure...' };
 
   let structure;
   try {
-    structure = await getWikiStructure(owner, repo, repoPath, type, options);
+    structure = await getWikiStructure(owner, repo, branch, type, options);
   } catch (error) {
     yield { type: 'error', message: error.message };
     return;
@@ -552,8 +544,6 @@ export async function* generateDetailedWiki(owner, repo, options = {}) {
  * 4. { type: 'complete' }
  */
 export async function* generateProductDocs(owner, repo, options = {}) {
-  const repoPath = join(config.reposDir, owner, repo);
-
   // Check if repository is indexed (required for RAG)
   const indexed = await isIndexed(owner, repo);
   if (!indexed) {
@@ -561,12 +551,16 @@ export async function* generateProductDocs(owner, repo, options = {}) {
     return;
   }
 
+  // Get metadata to find the branch
+  const metadata = await getProjectMetadata(owner, repo);
+  const branch = metadata?.branch || 'main';
+
   // Phase 1: Get/Generate structure
   yield { type: 'status', message: 'Analyzing product features and functionality...' };
 
   let structure;
   try {
-    structure = await getProductDocsStructure(owner, repo, repoPath, options);
+    structure = await getProductDocsStructure(owner, repo, branch, options);
   } catch (error) {
     yield { type: 'error', message: error.message };
     return;

@@ -85,7 +85,6 @@ export const config = {
 
   // Data directory
   dataDir: join(homedir(), '.productwiki'),
-  reposDir: join(homedir(), '.productwiki', 'repos'),
   vectorsDir: join(homedir(), '.productwiki', 'vectors'),
   metaDir: join(homedir(), '.productwiki', 'meta'),
 

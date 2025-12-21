@@ -45,7 +45,6 @@ app.use('*', async (c, next) => {
 });
 
 // Ensure data directories exist
-await mkdir(config.reposDir, { recursive: true });
 await mkdir(config.vectorsDir, { recursive: true });
 await mkdir(config.metaDir, { recursive: true });
 
