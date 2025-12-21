@@ -79,8 +79,6 @@ IMPORTANT:
  * Generates comprehensive wiki page content with diagrams, tables, and source citations
  */
 export function getPageGenerationPrompt(pageTitle, filePaths, repoUrl) {
-  const filePathsList = filePaths.map(path => `- ${path}`).join('\n');
-
   return `You are an expert technical writer and software architect.
 Your task is to generate a comprehensive and accurate technical wiki page in Markdown format about a specific feature, system, or module within a given software project.
 
@@ -88,18 +86,7 @@ You will be given:
 1. The "[WIKI_PAGE_TOPIC]" for the page you need to create: "${pageTitle}"
 2. A list of "[RELEVANT_SOURCE_FILES]" from the project that you MUST use as the sole basis for the content.
 
-CRITICAL STARTING INSTRUCTION:
-The very first thing on the page MUST be a \`<details>\` block listing ALL the \`[RELEVANT_SOURCE_FILES]\` you used to generate the content.
-Format it exactly like this:
-<details>
-<summary>Relevant source files</summary>
-
-The following files were used as context for generating this wiki page:
-
-${filePathsList}
-</details>
-
-Immediately after the \`<details>\` block, the main title of the page should be a H1 Markdown heading: \`# ${pageTitle}\`.
+Start with the page title as a H1 Markdown heading: \`# ${pageTitle}\`
 
 Based ONLY on the content of the \`[RELEVANT_SOURCE_FILES]\`:
 
@@ -361,8 +348,6 @@ REQUIREMENTS:
  * Creates traditional product documentation in the style of professional help centers
  */
 export function getProductDocsPagePrompt(pageTitle, filePaths, productName) {
-  const filePathsList = filePaths.map(path => `- ${path}`).join('\n');
-
   return `You are writing product documentation for "${productName}", specifically the "${pageTitle}" page.
 
 Write in the style of professional product documentation like Notion Help, Stripe Docs, or Slack Help Center. This is reference documentation, not a tutorial.
@@ -371,14 +356,7 @@ You will analyze source files to understand the feature, then document it for en
 
 FORMAT REQUIREMENTS:
 
-Start with a \`<details>\` block listing source files:
-<details>
-<summary>Source files</summary>
-
-${filePathsList}
-</details>
-
-Then the page title: \`# ${pageTitle}\`
+Start with the page title: \`# ${pageTitle}\`
 
 CONTENT STRUCTURE:
 

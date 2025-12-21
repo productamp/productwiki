@@ -16,7 +16,7 @@ generateRoutes.post('/generate/docs', async (c) => {
   return streamSSE(c, async (stream) => {
     try {
       const options = {
-        apiKey: c.get('apiKey'),
+        apiKeys: c.get('apiKeys'),
         provider: c.get('llmProvider'),
         model: c.get('geminiModel'),
       };
@@ -45,7 +45,7 @@ generateRoutes.post('/generate/package-prompt', async (c) => {
   return streamSSE(c, async (stream) => {
     try {
       const options = {
-        apiKey: c.get('apiKey'),
+        apiKeys: c.get('apiKeys'),
         provider: c.get('llmProvider'),
         model: c.get('geminiModel'),
       };
@@ -74,7 +74,7 @@ generateRoutes.post('/generate/reimplement-prompt', async (c) => {
   return streamSSE(c, async (stream) => {
     try {
       const options = {
-        apiKey: c.get('apiKey'),
+        apiKeys: c.get('apiKeys'),
         provider: c.get('llmProvider'),
         model: c.get('geminiModel'),
       };

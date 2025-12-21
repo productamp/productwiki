@@ -17,9 +17,27 @@ const app = new Hono();
 app.use('*', logger());
 app.use('*', cors());
 
-// Extract API key, provider, and model from headers into context
+// Extract API keys, provider, and model from headers into context
 app.use('*', async (c, next) => {
-  c.set('apiKey', c.req.header('x-api-key'));
+  // Parse API keys array from header, fallback to single key
+  const apiKeysHeader = c.req.header('x-api-keys');
+  let apiKeys = [];
+  if (apiKeysHeader) {
+    try {
+      apiKeys = JSON.parse(apiKeysHeader);
+    } catch {
+      apiKeys = [];
+    }
+  }
+  // Fallback to single key for backwards compat
+  if (apiKeys.length === 0) {
+    const singleKey = c.req.header('x-api-key');
+    if (singleKey) {
+      apiKeys = [singleKey];
+    }
+  }
+  c.set('apiKeys', apiKeys);
+  c.set('apiKey', apiKeys[0] || null); // Keep for backwards compat
   c.set('llmProvider', c.req.header('x-llm-provider'));
   c.set('geminiModel', c.req.header('x-gemini-model'));
   await next();

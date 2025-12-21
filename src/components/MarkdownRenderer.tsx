@@ -70,12 +70,45 @@ function MermaidDiagram({ code }: MermaidDiagramProps) {
   )
 }
 
+function createHeadingIdGenerator() {
+  const idCounts = new Map<string, number>()
+
+  return function generateHeadingId(text: string): string {
+    const baseId = text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+
+    const count = idCounts.get(baseId) || 0
+    idCounts.set(baseId, count + 1)
+    return count === 0 ? baseId : `${baseId}-${count}`
+  }
+}
+
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
+  // Create a new ID generator for each render to handle duplicate headings
+  const generateHeadingId = createHeadingIdGenerator()
+
   return (
     <div className={`prose dark:prose-invert max-w-none ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          h1({ children }) {
+            const text = String(children)
+            const id = generateHeadingId(text)
+            return <h1 id={id}>{children}</h1>
+          },
+          h2({ children }) {
+            const text = String(children)
+            const id = generateHeadingId(text)
+            return <h2 id={id}>{children}</h2>
+          },
+          h3({ children }) {
+            const text = String(children)
+            const id = generateHeadingId(text)
+            return <h3 id={id}>{children}</h3>
+          },
           code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '')
             const language = match?.[1]

@@ -1,11 +1,17 @@
 const BASE_URL = 'http://localhost:3847'
 const API_KEY_STORAGE_KEY = 'productwiki_api_key'
+const API_KEYS_STORAGE_KEY = 'productwiki_api_keys'
 const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider'
 const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model'
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview'
 
 export type LlmProvider = 'gemini' | 'ollama'
+
+export interface ApiKeyEntry {
+  key: string
+  label: string
+}
 
 export interface EmbeddingInfo {
   provider: string
@@ -73,6 +79,52 @@ export function setApiKey(key: string): void {
   }
 }
 
+export function getApiKeyEntries(): ApiKeyEntry[] {
+  const stored = localStorage.getItem(API_KEYS_STORAGE_KEY)
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored)
+      // Check if it's the old format (array of strings)
+      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+        // Migrate to new format
+        return parsed.map((key: string, i: number) => ({
+          key,
+          label: `Key ${i + 1}`,
+        }))
+      }
+      // New format
+      return parsed as ApiKeyEntry[]
+    } catch {
+      return []
+    }
+  }
+  // Migrate from single key if exists
+  const singleKey = getApiKey()
+  return singleKey ? [{ key: singleKey, label: 'Key 1' }] : []
+}
+
+export function setApiKeyEntries(entries: ApiKeyEntry[]): void {
+  const filtered = entries.filter(e => e.key.trim())
+  if (filtered.length > 0) {
+    localStorage.setItem(API_KEYS_STORAGE_KEY, JSON.stringify(filtered))
+    // Also set first key for backwards compat
+    setApiKey(filtered[0].key)
+  } else {
+    localStorage.removeItem(API_KEYS_STORAGE_KEY)
+    localStorage.removeItem(API_KEY_STORAGE_KEY)
+  }
+}
+
+// Legacy functions for backwards compatibility
+export function getApiKeys(): string[] {
+  return getApiKeyEntries().map(e => e.key)
+}
+
+export function setApiKeys(keys: string[]): void {
+  const entries = keys.map((key, i) => ({ key, label: `Key ${i + 1}` }))
+  setApiKeyEntries(entries)
+}
+
 export function getProvider(): LlmProvider {
   return (localStorage.getItem(PROVIDER_STORAGE_KEY) as LlmProvider) || 'gemini'
 }
@@ -97,9 +149,11 @@ function getHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
-  const apiKey = getApiKey()
-  if (apiKey) {
-    headers['X-API-Key'] = apiKey
+  const apiKeyEntries = getApiKeyEntries()
+  if (apiKeyEntries.length > 0) {
+    headers['X-API-Keys'] = JSON.stringify(apiKeyEntries)
+    // Also set single key for backwards compat
+    headers['X-API-Key'] = apiKeyEntries[0].key
   }
   const provider = getProvider()
   headers['X-LLM-Provider'] = provider

@@ -23,7 +23,7 @@ indexRoutes.post('/index', async (c) => {
 
     try {
       const options = {
-        apiKey: c.get('apiKey'),
+        apiKeys: c.get('apiKeys'),
         provider: c.get('llmProvider'),
         signal: abortSignal,
       };

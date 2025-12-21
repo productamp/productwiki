@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
-import { ErrorLog } from '@/components/ErrorLog'
-import { getProject, generatePackagePrompt, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
+import { NotificationDropdown } from '@/components/NotificationDropdown'
+import { SettingsButton } from '@/components/Settings'
+import { getProject, generatePackagePrompt, type ProjectMetadata } from '@/lib/api'
 import { Loader2, ArrowLeft, Package, Copy, Check, RotateCw } from 'lucide-react'
 
 export default function PackagePromptPage() {
@@ -14,22 +15,7 @@ export default function PackagePromptPage() {
   const [error, setError] = useState('')
   const [prompt, setPrompt] = useState('')
   const [generating, setGenerating] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
   const [copied, setCopied] = useState(false)
-
-  const loadErrors = async () => {
-    try {
-      const logs = await getServerLogs()
-      setErrors(logs)
-    } catch {
-      // Ignore errors fetching logs
-    }
-  }
-
-  const handleClearErrors = async () => {
-    await clearServerLogs()
-    setErrors([])
-  }
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(prompt)
@@ -58,10 +44,6 @@ export default function PackagePromptPage() {
     }
 
     loadProject()
-    loadErrors()
-
-    const interval = setInterval(loadErrors, 5000)
-    return () => clearInterval(interval)
   }, [owner, repo])
 
   const handleGenerate = async () => {
@@ -82,7 +64,6 @@ export default function PackagePromptPage() {
       localStorage.setItem(`package_prompt_${owner}_${repo}`, fullContent)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate prompt')
-      loadErrors()
     } finally {
       setGenerating(false)
     }
@@ -118,48 +99,55 @@ export default function PackagePromptPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8 relative">
-            <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Link to={`/repo/${owner}/${repo}`}>
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Package className="h-6 w-6" />
-              Electron Package Prompt
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {owner}/{repo}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {prompt && !generating && (
-              <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
-                <RotateCw className="h-4 w-4" />
+    <div className="min-h-screen bg-background relative">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 bg-background border-b">
+        <div className="max-w-6xl mx-auto px-8 py-4">
+          <div className="flex items-center gap-4">
+            <Link to={`/repo/${owner}/${repo}`}>
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-5 w-5" />
               </Button>
-            )}
-            {prompt && (
-              <Button onClick={handleCopy} variant="outline">
-                {copied ? (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy Prompt
-                  </>
-                )}
-              </Button>
-            )}
+            </Link>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Package className="h-6 w-6" />
+                Electron Package Prompt
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {owner}/{repo}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {prompt && !generating && (
+                <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
+                  <RotateCw className="h-4 w-4" />
+                </Button>
+              )}
+              {prompt && (
+                <Button onClick={handleCopy} variant="outline">
+                  {copied ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy Prompt
+                    </>
+                  )}
+                </Button>
+              )}
+              <NotificationDropdown />
+              <SettingsButton />
+            </div>
           </div>
         </div>
+      </div>
 
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-8 py-6 space-y-6">
         {/* Description */}
         <Card>
           <CardContent className="pt-6">
@@ -187,13 +175,6 @@ export default function PackagePromptPage() {
           <p className="text-sm text-destructive text-center">{error}</p>
         )}
       </div>
-
-      {/* Error Log */}
-      {errors.length > 0 && (
-        <div className="fixed bottom-4 right-4 w-96">
-          <ErrorLog errors={errors} onClear={handleClearErrors} />
-        </div>
-      )}
     </div>
   )
 }

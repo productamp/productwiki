@@ -2,14 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { ErrorLog } from '@/components/ErrorLog'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
+import { NotificationDropdown } from '@/components/NotificationDropdown'
+import { SettingsButton } from '@/components/Settings'
 import {
   getProject,
   generateBriefWiki,
   generateDetailedWiki,
-  getServerLogs,
-  clearServerLogs,
   type ProjectMetadata,
   type WikiStructure,
   type WikiSource,
@@ -44,32 +43,18 @@ export default function WikiPage() {
   const [error, setError] = useState('')
   const [generating, setGenerating] = useState(false)
   const [status, setStatus] = useState('')
-  const [errors, setErrors] = useState<string[]>([])
   const [copied, setCopied] = useState(false)
 
   // Wiki state
   const [structure, setStructure] = useState<WikiStructure | null>(null)
   const [wikiState, setWikiState] = useState<WikiState>({})
   const [activePage, setActivePage] = useState<string>('')
+  const [cacheChecked, setCacheChecked] = useState(false)
 
   const contentRef = useRef<HTMLDivElement>(null)
 
   const wikiType = type === 'brief' ? 'brief' : 'detailed'
   const cacheKey = `wiki_${wikiType}_${owner}_${repo}`
-
-  const loadErrors = async () => {
-    try {
-      const logs = await getServerLogs()
-      setErrors(logs)
-    } catch {
-      // Ignore errors fetching logs
-    }
-  }
-
-  const handleClearErrors = async () => {
-    await clearServerLogs()
-    setErrors([])
-  }
 
   const handleCopy = async () => {
     // Build markdown from all pages
@@ -107,6 +92,7 @@ export default function WikiPage() {
         // Ignore parse errors
       }
     }
+    setCacheChecked(true)
   }, [cacheKey])
 
   useEffect(() => {
@@ -124,10 +110,6 @@ export default function WikiPage() {
     }
 
     loadProject()
-    loadErrors()
-
-    const interval = setInterval(loadErrors, 5000)
-    return () => clearInterval(interval)
   }, [owner, repo])
 
   const handleGenerate = async () => {
@@ -218,8 +200,6 @@ export default function WikiPage() {
                 error: event.message,
               },
             }))
-            // Refresh error logs so the error shows in the toast
-            loadErrors()
             break
 
           case 'complete':
@@ -231,18 +211,8 @@ export default function WikiPage() {
             break
         }
       }
-
-      // Cache the result
-      if (structure) {
-        localStorage.setItem(cacheKey, JSON.stringify({
-          structure,
-          wikiState,
-          generatedAt: new Date().toISOString(),
-        }))
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate wiki')
-      loadErrors()
     } finally {
       setGenerating(false)
       setStatus('')
@@ -262,10 +232,11 @@ export default function WikiPage() {
 
   // Auto-generate on mount if no cached wiki
   useEffect(() => {
-    if (!loading && project && !structure && !generating) {
+    // Wait for cache check to complete before deciding to auto-generate
+    if (!loading && project && !structure && !generating && cacheChecked) {
       handleGenerate()
     }
-  }, [loading, project, structure])
+  }, [loading, project, structure, generating, cacheChecked])
 
   const scrollToPage = (pageId: string) => {
     setActivePage(pageId)
@@ -302,8 +273,8 @@ export default function WikiPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-4 p-4 border-b">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 bg-background flex items-center gap-4 p-4 border-b">
         <Link to={`/repo/${owner}/${repo}`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-5 w-5" />
@@ -342,6 +313,8 @@ export default function WikiPage() {
               )}
             </Button>
           )}
+          <NotificationDropdown />
+          <SettingsButton />
         </div>
       </div>
 
@@ -499,13 +472,6 @@ export default function WikiPage() {
           </div>
         </div>
       </div>
-
-      {/* Error Log */}
-      {errors.length > 0 && (
-        <div className="fixed bottom-4 right-4 w-96">
-          <ErrorLog errors={errors} onClear={handleClearErrors} />
-        </div>
-      )}
     </div>
   )
 }

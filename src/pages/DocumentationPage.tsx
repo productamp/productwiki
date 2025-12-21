@@ -3,9 +3,16 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
-import { ErrorLog } from '@/components/ErrorLog'
-import { getProject, generateDocs, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
-import { Loader2, ArrowLeft, BookOpen, Copy, Check, AlertTriangle, RotateCw } from 'lucide-react'
+import { NotificationDropdown } from '@/components/NotificationDropdown'
+import { SettingsButton } from '@/components/Settings'
+import { getProject, generateDocs, type ProjectMetadata } from '@/lib/api'
+import { Loader2, ArrowLeft, BookOpen, Copy, Check, AlertTriangle, RotateCw, Info } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 export default function DocumentationPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -14,22 +21,7 @@ export default function DocumentationPage() {
   const [error, setError] = useState('')
   const [docs, setDocs] = useState('')
   const [generating, setGenerating] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
   const [copied, setCopied] = useState(false)
-
-  const loadErrors = async () => {
-    try {
-      const logs = await getServerLogs()
-      setErrors(logs)
-    } catch {
-      // Ignore errors fetching logs
-    }
-  }
-
-  const handleClearErrors = async () => {
-    await clearServerLogs()
-    setErrors([])
-  }
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(docs)
@@ -58,10 +50,6 @@ export default function DocumentationPage() {
     }
 
     loadProject()
-    loadErrors()
-
-    const interval = setInterval(loadErrors, 5000)
-    return () => clearInterval(interval)
   }, [owner, repo])
 
   const handleGenerate = async () => {
@@ -82,7 +70,6 @@ export default function DocumentationPage() {
       localStorage.setItem(`docs_${owner}_${repo}`, fullContent)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate documentation')
-      loadErrors()
     } finally {
       setGenerating(false)
     }
@@ -118,10 +105,11 @@ export default function DocumentationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8 relative">
-            <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background relative">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 bg-background border-b">
+        <div className="max-w-6xl mx-auto px-8 py-4">
+          <div className="flex items-center gap-4">
           <Link to={`/repo/${owner}/${repo}`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
@@ -131,6 +119,16 @@ export default function DocumentationPage() {
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <BookOpen className="h-6 w-6" />
               Technical Documentation
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p>Comprehensive technical documentation generated from the codebase analysis. Includes architecture overview, key components, data flow, and API reference.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </h1>
             <p className="text-sm text-muted-foreground">
               {owner}/{repo}
@@ -157,9 +155,15 @@ export default function DocumentationPage() {
                 )}
               </Button>
             )}
+            <NotificationDropdown />
+            <SettingsButton />
+          </div>
           </div>
         </div>
+      </div>
 
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-8 py-6 space-y-6">
         {/* Embedding compatibility warning */}
         {project?.embeddingCompatibility && !project.embeddingCompatibility.compatible && (
           <Card className="border-yellow-500 bg-yellow-500/10">
@@ -184,16 +188,6 @@ export default function DocumentationPage() {
           </Card>
         )}
 
-        {/* Description */}
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              Comprehensive technical documentation generated from the codebase analysis.
-              Includes architecture overview, key components, data flow, and API reference.
-            </p>
-          </CardContent>
-        </Card>
-
         {/* Status */}
         {generating && (
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -210,13 +204,6 @@ export default function DocumentationPage() {
           <p className="text-sm text-destructive text-center">{error}</p>
         )}
       </div>
-
-      {/* Error Log */}
-      {errors.length > 0 && (
-        <div className="fixed bottom-4 right-4 w-96">
-          <ErrorLog errors={errors} onClear={handleClearErrors} />
-        </div>
-      )}
     </div>
   )
 }

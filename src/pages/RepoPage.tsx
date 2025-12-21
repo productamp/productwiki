@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ErrorLog } from '@/components/ErrorLog'
+import { AppHeader } from '@/components/AppHeader'
 import { IndexingDialog } from '@/components/IndexingDialog'
-import { getProject, getServerLogs, clearServerLogs, type ProjectMetadata } from '@/lib/api'
+import { getProject, type ProjectMetadata } from '@/lib/api'
 import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Zap, Users, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -85,7 +85,6 @@ export default function RepoPage() {
   const [project, setProject] = useState<ProjectMetadata | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [errors, setErrors] = useState<string[]>([])
   const [showReindexDialog, setShowReindexDialog] = useState(false)
   const [generatedTools, setGeneratedTools] = useState<Set<string>>(new Set())
 
@@ -101,20 +100,6 @@ export default function RepoPage() {
     setGeneratedTools(generated)
   }
 
-  const loadErrors = async () => {
-    try {
-      const logs = await getServerLogs()
-      setErrors(logs)
-    } catch {
-      // Ignore errors fetching logs
-    }
-  }
-
-  const handleClearErrors = async () => {
-    await clearServerLogs()
-    setErrors([])
-  }
-
   const handleReindexComplete = (result: ProjectMetadata) => {
     setShowReindexDialog(false)
     setProject(result)
@@ -127,7 +112,6 @@ export default function RepoPage() {
   const handleReindexError = (errorMessage: string) => {
     setShowReindexDialog(false)
     setError(errorMessage)
-    loadErrors()
   }
 
   useEffect(() => {
@@ -145,12 +129,7 @@ export default function RepoPage() {
     }
 
     loadProject()
-    loadErrors()
     checkGeneratedTools()
-
-    // Poll for errors every 5 seconds
-    const interval = setInterval(loadErrors, 5000)
-    return () => clearInterval(interval)
   }, [owner, repo])
 
   if (loading) {
@@ -177,38 +156,28 @@ export default function RepoPage() {
 
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-4">
-          <Link to="/">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
+      <AppHeader title={`${owner}/${repo}`} />
+
+      {/* Action Buttons */}
+      <div className="max-w-4xl mx-auto px-6 pt-4 flex justify-end gap-2">
+        {project?.url && (
+          <a href={project.url} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              View on GitHub
             </Button>
-          </Link>
-          <h1 className="text-xl font-semibold">
-            {owner}/{repo}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {project?.url && (
-            <a href={project.url} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                View on GitHub
-              </Button>
-            </a>
-          )}
-          {project?.url && (
-            <Button
-              variant="outline"
-              onClick={() => setShowReindexDialog(true)}
-              disabled={showReindexDialog}
-            >
-              <RotateCw className="mr-2 h-4 w-4" />
-              Re-index
-            </Button>
-          )}
-        </div>
+          </a>
+        )}
+        {project?.url && (
+          <Button
+            variant="outline"
+            onClick={() => setShowReindexDialog(true)}
+            disabled={showReindexDialog}
+          >
+            <RotateCw className="mr-2 h-4 w-4" />
+            Re-index
+          </Button>
+        )}
       </div>
 
       <div className="max-w-4xl mx-auto p-6 space-y-8">
@@ -269,13 +238,6 @@ export default function RepoPage() {
           <p className="text-sm text-destructive text-center">{error}</p>
         )}
       </div>
-
-      {/* Error Log */}
-      {errors.length > 0 && (
-        <div className="fixed bottom-4 right-4 w-96">
-          <ErrorLog errors={errors} onClear={handleClearErrors} />
-        </div>
-      )}
 
       {/* Re-index Dialog */}
       {project?.url && (
