@@ -2,6 +2,9 @@
  * Global RAG (Retrieval Augmented Generation) Query Module
  * Provides semantic search functionality for all generation tools
  */
+import { readFile } from 'fs/promises';
+import { join } from 'path';
+import { config } from '../config/index.js';
 import { embed } from '../providers/index.js';
 import { searchSimilar, isIndexed } from './vectorStore.js';
 
@@ -97,6 +100,22 @@ export async function getContextForTopic(owner, repo, topic, options = {}, limit
     context: buildRagContext(chunks),
     chunks,
   };
+}
+
+/**
+ * Get project metadata from the meta directory
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @returns {Promise<Object|null>} Project metadata or null if not found
+ */
+export async function getProjectMetadata(owner, repo) {
+  try {
+    const metaPath = join(config.metaDir, `${owner}_${repo}.json`);
+    const content = await readFile(metaPath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
 }
 
 // Re-export isIndexed for convenience

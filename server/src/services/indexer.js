@@ -78,9 +78,9 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
     throw new Error('Indexing cancelled');
   }
 
-  // Clone and read files
+  // Fetch files from GitHub API
   yield { phase: 'clone', status: 'started' };
-  const { owner, repo, files } = await processRepository(url);
+  const { owner, repo, files, branch } = await processRepository(url, config);
   yield { phase: 'clone', status: 'completed' };
 
   if (signal?.aborted) {
@@ -152,6 +152,7 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
     owner,
     repo,
     url,
+    branch,
     indexedAt: new Date().toISOString(),
     fileCount: files.length,
     chunkCount: allChunks.length,
