@@ -551,3 +551,51 @@ export async function* generateProductDocs(
 ): AsyncGenerator<WikiEvent> {
   yield* generateWikiInternal(owner, repo, 'product-docs')
 }
+
+// Job status types
+export type JobStatus = 'running' | 'complete' | 'error' | 'not_found'
+
+export interface JobStatusResponse {
+  status: JobStatus
+  eventCount?: number
+}
+
+export interface JobEventsResponse {
+  status: JobStatus
+  events: WikiEvent[] | Array<{ content?: string; error?: string }>
+}
+
+/**
+ * Get the status of a running job
+ */
+export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
+  const response = await fetch(`${BASE_URL}/jobs/${encodeURIComponent(jobId)}/status`)
+  if (!response.ok) {
+    throw new Error('Failed to get job status')
+  }
+  return response.json()
+}
+
+/**
+ * Get all buffered events for a job (for state recovery)
+ */
+export async function getJobEvents(jobId: string): Promise<JobEventsResponse> {
+  const response = await fetch(`${BASE_URL}/jobs/${encodeURIComponent(jobId)}/events`)
+  if (!response.ok) {
+    throw new Error('Failed to get job events')
+  }
+  return response.json()
+}
+
+/**
+ * Job ID builders for different generation types
+ */
+export const JobIds = {
+  briefWiki: (owner: string, repo: string) => `wiki_brief_${owner}_${repo}`,
+  detailedWiki: (owner: string, repo: string) => `wiki_detailed_${owner}_${repo}`,
+  dynamicWiki: (owner: string, repo: string) => `wiki_dynamic_${owner}_${repo}`,
+  productDocs: (owner: string, repo: string) => `wiki_product-docs_${owner}_${repo}`,
+  docs: (owner: string, repo: string) => `generate_docs_${owner}_${repo}`,
+  packagePrompt: (owner: string, repo: string) => `generate_package-prompt_${owner}_${repo}`,
+  reimplementPrompt: (owner: string, repo: string) => `generate_reimplement-prompt_${owner}_${repo}`,
+}

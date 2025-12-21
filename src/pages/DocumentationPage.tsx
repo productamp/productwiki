@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
 import { NotificationDropdown } from '@/components/NotificationDropdown'
 import { SettingsButton } from '@/components/Settings'
-import { getProject, generateDocs, type ProjectMetadata } from '@/lib/api'
+import { getProject, generateDocs, JobIds, type ProjectMetadata } from '@/lib/api'
+import { useSimpleJobReconnection } from '@/hooks/useJobReconnection'
 import { Loader2, ArrowLeft, BookOpen, Copy, Check, AlertTriangle, RotateCw, Info } from 'lucide-react'
 import {
   Tooltip,
@@ -51,6 +52,15 @@ export default function DocumentationPage() {
 
     loadProject()
   }, [owner, repo])
+
+  // Check for running job and reconnect if needed
+  const { reconnecting } = useSimpleJobReconnection({
+    jobId: owner && repo ? JobIds.docs(owner, repo) : '',
+    generator: () => generateDocs(owner!, repo!),
+    onContent: setDocs,
+    cacheKey: `docs_${owner}_${repo}`,
+    enabled: !loading && !!owner && !!repo,
+  })
 
   const handleGenerate = async () => {
     if (!owner || !repo) return
@@ -189,10 +199,10 @@ export default function DocumentationPage() {
         )}
 
         {/* Status */}
-        {generating && (
+        {(generating || reconnecting) && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Analyzing codebase and generating documentation...
+            {reconnecting ? 'Reconnecting to generation...' : 'Analyzing codebase and generating documentation...'}
           </div>
         )}
 

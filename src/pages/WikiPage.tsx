@@ -9,10 +9,13 @@ import {
   getProject,
   generateBriefWiki,
   generateDetailedWiki,
+  JobIds,
   type ProjectMetadata,
   type WikiStructure,
   type WikiSource,
+  type WikiEvent,
 } from '@/lib/api'
+import { useWikiJobReconnection } from '@/hooks/useJobReconnection'
 import {
   Loader2,
   ArrowLeft,
@@ -75,7 +78,88 @@ export default function WikiPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Load cached wiki on mount
+  // Process wiki events to update state
+  const processEvent = (event: WikiEvent, currentPageIdRef: { value: string }, currentContentRef: { value: string }) => {
+    switch (event.type) {
+      case 'status':
+        setStatus(event.message)
+        break
+
+      case 'structure':
+        setStructure(event.wiki)
+        const initialState: WikiState = {}
+        for (const page of event.wiki.pages) {
+          initialState[page.id] = {
+            status: 'pending',
+            content: '',
+            sources: [],
+          }
+        }
+        setWikiState(initialState)
+        if (event.wiki.pages.length > 0) {
+          setActivePage(event.wiki.pages[0].id)
+        }
+        break
+
+      case 'page_start':
+        currentPageIdRef.value = event.pageId
+        currentContentRef.value = ''
+        setWikiState(prev => ({
+          ...prev,
+          [event.pageId]: {
+            status: 'generating',
+            content: '',
+            sources: [],
+          },
+        }))
+        setActivePage(event.pageId)
+        setStatus(`Generating: ${event.title}...`)
+        break
+
+      case 'content':
+        currentContentRef.value += event.chunk
+        setWikiState(prev => ({
+          ...prev,
+          [currentPageIdRef.value]: {
+            ...prev[currentPageIdRef.value],
+            content: currentContentRef.value,
+          },
+        }))
+        break
+
+      case 'page_complete':
+        setWikiState(prev => ({
+          ...prev,
+          [event.pageId]: {
+            ...prev[event.pageId],
+            status: 'complete',
+            sources: event.sources,
+          },
+        }))
+        break
+
+      case 'page_error':
+        setWikiState(prev => ({
+          ...prev,
+          [event.pageId]: {
+            ...prev[event.pageId],
+            status: 'error',
+            error: event.message,
+          },
+        }))
+        break
+
+      case 'complete':
+        setStatus('')
+        break
+
+      case 'error':
+        setError(event.message)
+        break
+    }
+  }
+
+  // Load cached wiki on mount and check for running job
   useEffect(() => {
     const cached = localStorage.getItem(cacheKey)
     if (cached) {
@@ -94,6 +178,18 @@ export default function WikiPage() {
     }
     setCacheChecked(true)
   }, [cacheKey])
+
+  // Check for running job and reconnect if needed
+  const { reconnecting, status: reconnectStatus } = useWikiJobReconnection({
+    jobId: owner && repo
+      ? (wikiType === 'brief' ? JobIds.briefWiki(owner, repo) : JobIds.detailedWiki(owner, repo))
+      : '',
+    generator: () => wikiType === 'brief'
+      ? generateBriefWiki(owner!, repo!)
+      : generateDetailedWiki(owner!, repo!),
+    processEvent,
+    enabled: cacheChecked && !!owner && !!repo,
+  })
 
   useEffect(() => {
     async function loadProject() {
@@ -126,90 +222,11 @@ export default function WikiPage() {
         ? generateBriefWiki(owner, repo)
         : generateDetailedWiki(owner, repo)
 
-      let currentPageId = ''
-      let currentContent = ''
+      const currentPageIdRef = { value: '' }
+      const currentContentRef = { value: '' }
 
       for await (const event of generator) {
-        switch (event.type) {
-          case 'status':
-            setStatus(event.message)
-            break
-
-          case 'structure':
-            setStructure(event.wiki)
-            // Initialize wiki state
-            const initialState: WikiState = {}
-            for (const page of event.wiki.pages) {
-              initialState[page.id] = {
-                status: 'pending',
-                content: '',
-                sources: [],
-              }
-            }
-            setWikiState(initialState)
-            // Set first page as active
-            if (event.wiki.pages.length > 0) {
-              setActivePage(event.wiki.pages[0].id)
-            }
-            break
-
-          case 'page_start':
-            currentPageId = event.pageId
-            currentContent = ''
-            setWikiState(prev => ({
-              ...prev,
-              [event.pageId]: {
-                status: 'generating',
-                content: '',
-                sources: [],
-              },
-            }))
-            // Navigate to this page
-            setActivePage(event.pageId)
-            setStatus(`Generating: ${event.title}...`)
-            break
-
-          case 'content':
-            currentContent += event.chunk
-            setWikiState(prev => ({
-              ...prev,
-              [currentPageId]: {
-                ...prev[currentPageId],
-                content: currentContent,
-              },
-            }))
-            break
-
-          case 'page_complete':
-            setWikiState(prev => ({
-              ...prev,
-              [event.pageId]: {
-                ...prev[event.pageId],
-                status: 'complete',
-                sources: event.sources,
-              },
-            }))
-            break
-
-          case 'page_error':
-            setWikiState(prev => ({
-              ...prev,
-              [event.pageId]: {
-                ...prev[event.pageId],
-                status: 'error',
-                error: event.message,
-              },
-            }))
-            break
-
-          case 'complete':
-            setStatus('')
-            break
-
-          case 'error':
-            setError(event.message)
-            break
-        }
+        processEvent(event, currentPageIdRef, currentContentRef)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate wiki')
@@ -293,7 +310,7 @@ export default function WikiPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {structure && !generating && (
+          {structure && !generating && !reconnecting && (
             <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
               <RotateCw className="h-4 w-4" />
             </Button>
@@ -338,10 +355,10 @@ export default function WikiPage() {
       )}
 
       {/* Status */}
-      {status && (
+      {(status || reconnectStatus) && (
         <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground border-b">
           <Loader2 className="h-4 w-4 animate-spin" />
-          {status}
+          {reconnectStatus || status}
         </div>
       )}
 

@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
 import { NotificationDropdown } from '@/components/NotificationDropdown'
 import { SettingsButton } from '@/components/Settings'
-import { getProject, generatePackagePrompt, type ProjectMetadata } from '@/lib/api'
+import { getProject, generatePackagePrompt, JobIds, type ProjectMetadata } from '@/lib/api'
+import { useSimpleJobReconnection } from '@/hooks/useJobReconnection'
 import { Loader2, ArrowLeft, Package, Copy, Check, RotateCw } from 'lucide-react'
 
 export default function PackagePromptPage() {
@@ -45,6 +46,15 @@ export default function PackagePromptPage() {
 
     loadProject()
   }, [owner, repo])
+
+  // Check for running job and reconnect if needed
+  const { reconnecting } = useSimpleJobReconnection({
+    jobId: owner && repo ? JobIds.packagePrompt(owner, repo) : '',
+    generator: () => generatePackagePrompt(owner!, repo!),
+    onContent: setPrompt,
+    cacheKey: `package_prompt_${owner}_${repo}`,
+    enabled: !loading && !!owner && !!repo,
+  })
 
   const handleGenerate = async () => {
     if (!owner || !repo) return
@@ -160,10 +170,10 @@ export default function PackagePromptPage() {
         </Card>
 
         {/* Status */}
-        {generating && (
+        {(generating || reconnecting) && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Analyzing codebase and generating migration prompt...
+            {reconnecting ? 'Reconnecting to generation...' : 'Analyzing codebase and generating migration prompt...'}
           </div>
         )}
 

@@ -9,6 +9,7 @@ import { projectsRoutes } from './routes/projects.js';
 import { generateRoutes } from './routes/generate.js';
 import { wikiRoutes } from './routes/wiki.js';
 import { logsRoutes } from './routes/logs.js';
+import { jobsRoutes } from './routes/jobs.js';
 import { mkdir } from 'fs/promises';
 
 const app = new Hono();
@@ -59,6 +60,7 @@ app.route('/', projectsRoutes);
 app.route('/', generateRoutes);
 app.route('/', wikiRoutes);
 app.route('/', logsRoutes);
+app.route('/', jobsRoutes);
 
 // Start server
 serve({
