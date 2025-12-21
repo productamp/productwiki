@@ -8,8 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Settings as SettingsIcon, Check } from 'lucide-react'
-import { setApiKey, getApiKey, getProvider, setProvider, getGeminiModel, setGeminiModel, DEFAULT_GEMINI_MODEL, type LlmProvider } from '@/lib/api'
+import { Settings as SettingsIcon, Check, Plus, X } from 'lucide-react'
+import { getApiKeyEntries, setApiKeyEntries, getProvider, setProvider, getGeminiModel, setGeminiModel, DEFAULT_GEMINI_MODEL, type LlmProvider, type ApiKeyEntry } from '@/lib/api'
 
 interface SettingsProps {
   open: boolean
@@ -17,14 +17,15 @@ interface SettingsProps {
 }
 
 export function Settings({ open, onOpenChange }: SettingsProps) {
-  const [apiKey, setApiKeyState] = useState('')
+  const [apiKeys, setApiKeysState] = useState<ApiKeyEntry[]>([{ key: '', label: '' }])
   const [provider, setProviderState] = useState<LlmProvider>('gemini')
   const [geminiModel, setGeminiModelState] = useState(DEFAULT_GEMINI_MODEL)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setApiKeyState(getApiKey() || '')
+      const entries = getApiKeyEntries()
+      setApiKeysState(entries.length > 0 ? entries : [{ key: '', label: '' }])
       setProviderState(getProvider())
       setGeminiModelState(getGeminiModel())
       setSaved(false)
@@ -32,13 +33,38 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
   }, [open])
 
   const handleSave = () => {
-    setApiKey(apiKey)
+    // Filter out empty keys and assign default labels if missing
+    const filtered = apiKeys
+      .filter(e => e.key.trim())
+      .map((e, i) => ({
+        key: e.key,
+        label: e.label.trim() || `Key ${i + 1}`,
+      }))
+    setApiKeyEntries(filtered)
     setProvider(provider)
     setGeminiModel(geminiModel)
     setSaved(true)
     setTimeout(() => {
       onOpenChange(false)
     }, 500)
+  }
+
+  const addApiKey = () => {
+    setApiKeysState([...apiKeys, { key: '', label: '' }])
+  }
+
+  const removeApiKey = (index: number) => {
+    if (apiKeys.length > 1) {
+      setApiKeysState(apiKeys.filter((_, i) => i !== index))
+    } else {
+      setApiKeysState([{ key: '', label: '' }])
+    }
+  }
+
+  const updateApiKey = (index: number, field: 'key' | 'label', value: string) => {
+    const newKeys = [...apiKeys]
+    newKeys[index] = { ...newKeys[index], [field]: value }
+    setApiKeysState(newKeys)
   }
 
   return (
@@ -77,15 +103,52 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
           {provider === 'gemini' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Google API Key</label>
-                <Input
-                  type="password"
-                  placeholder="AIza..."
-                  value={apiKey}
-                  onChange={(e) => setApiKeyState(e.target.value)}
-                />
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Google API Keys</label>
+                  <span className="text-xs text-muted-foreground">
+                    {apiKeys.filter(e => e.key.trim()).length} key{apiKeys.filter(e => e.key.trim()).length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {apiKeys.map((entry, index) => (
+                    <div key={index} className="space-y-1.5 p-3 border rounded-md">
+                      <div className="flex gap-2">
+                        <Input
+                          type="text"
+                          placeholder={`Key ${index + 1}`}
+                          value={entry.label}
+                          onChange={(e) => updateApiKey(index, 'label', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeApiKey(index)}
+                          className="shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Input
+                        type="password"
+                        placeholder="AIza..."
+                        value={entry.key}
+                        onChange={(e) => updateApiKey(index, 'key', e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addApiKey}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add API Key
+                </Button>
                 <p className="text-xs text-muted-foreground">
-                  Get your API key from{' '}
+                  Add multiple keys to rotate when rate limited. Get keys from{' '}
                   <a
                     href="https://aistudio.google.com/apikey"
                     target="_blank"
@@ -152,7 +215,6 @@ export function SettingsButton() {
         variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        className="absolute top-4 right-4"
       >
         <SettingsIcon className="h-5 w-5" />
       </Button>

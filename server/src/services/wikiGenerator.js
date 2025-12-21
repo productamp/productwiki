@@ -3,6 +3,7 @@ import { readFile } from 'fs/promises';
 import { config } from '../config/index.js';
 import { streamChat } from '../providers/index.js';
 import { readRepositoryFiles } from './repository.js';
+import { queryRag, buildRagContext, isIndexed } from './ragQuery.js';
 import { logError } from './errorLog.js';
 import {
   getStructureGenerationPrompt,
@@ -42,48 +43,49 @@ async function getReadmeContent(repoPath) {
 }
 
 /**
- * Read specific files from repository and combine their content
+ * Number of chunks to retrieve from RAG for each wiki page
  */
-async function readFilesContent(repoPath, filePaths) {
-  const contents = [];
+const WIKI_CHUNK_LIMIT = 15;
 
-  for (const filePath of filePaths) {
-    try {
-      const fullPath = join(repoPath, filePath);
-      const content = await readFile(fullPath, 'utf-8');
-      contents.push({
-        path: filePath,
-        content,
-      });
-    } catch (err) {
-      console.warn(`Could not read file ${filePath}:`, err.message);
-    }
-  }
-
-  return contents;
+/**
+ * Get relevant chunks for a page using RAG vector search
+ */
+async function getRelevantChunks(owner, repo, page, options = {}) {
+  // Build search query from page title and description
+  const searchQuery = `${page.title}. ${page.description || ''}`;
+  return queryRag(owner, repo, searchQuery, options, WIKI_CHUNK_LIMIT);
 }
 
 /**
- * Build context string from file contents
+ * Maximum file tree size (in characters) to include in structure generation
  */
-function buildFileContext(files) {
-  return files
-    .map((file, index) => {
-      const ext = file.path.split('.').pop() || '';
-      return `${index + 1}.\nFile Path: ${file.path}\nContent:\n\`\`\`${ext}\n${file.content}\n\`\`\``;
-    })
-    .join('\n\n');
-}
+const MAX_FILE_TREE_CHARS = 10000;
+
+/**
+ * Maximum README size (in characters) to include in structure generation
+ */
+const MAX_README_CHARS = 8000;
 
 /**
  * Generate wiki structure using LLM
  * Phase 1: Analyze file tree + README to determine optimal wiki structure
  */
 async function generateWikiStructure(owner, repo, repoPath, isComprehensive, options = {}) {
-  const fileTree = await getFileTree(repoPath);
-  const readme = await getReadmeContent(repoPath);
+  let fileTree = await getFileTree(repoPath);
+  let readme = await getReadmeContent(repoPath);
+
+  // Truncate if too long to prevent rate limits
+  if (fileTree.length > MAX_FILE_TREE_CHARS) {
+    fileTree = fileTree.slice(0, MAX_FILE_TREE_CHARS) + '\n... [truncated]';
+    console.log(`[Wiki] File tree truncated from ${fileTree.length} to ${MAX_FILE_TREE_CHARS} chars`);
+  }
+  if (readme.length > MAX_README_CHARS) {
+    readme = readme.slice(0, MAX_README_CHARS) + '\n... [truncated]';
+    console.log(`[Wiki] README truncated from ${readme.length} to ${MAX_README_CHARS} chars`);
+  }
 
   const prompt = getStructureGenerationPrompt(owner, repo, fileTree, readme, isComprehensive);
+  console.log(`[Wiki] Structure prompt size: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
 
   const messages = [
     {
@@ -131,10 +133,21 @@ async function generateWikiStructure(owner, repo, repoPath, isComprehensive, opt
  * Phase 1: Analyze file tree + README to determine user-focused documentation structure
  */
 async function generateProductDocsStructure(owner, repo, repoPath, options = {}) {
-  const fileTree = await getFileTree(repoPath);
-  const readme = await getReadmeContent(repoPath);
+  let fileTree = await getFileTree(repoPath);
+  let readme = await getReadmeContent(repoPath);
+
+  // Truncate if too long to prevent rate limits
+  if (fileTree.length > MAX_FILE_TREE_CHARS) {
+    fileTree = fileTree.slice(0, MAX_FILE_TREE_CHARS) + '\n... [truncated]';
+    console.log(`[ProductDocs] File tree truncated from ${fileTree.length} to ${MAX_FILE_TREE_CHARS} chars`);
+  }
+  if (readme.length > MAX_README_CHARS) {
+    readme = readme.slice(0, MAX_README_CHARS) + '\n... [truncated]';
+    console.log(`[ProductDocs] README truncated from ${readme.length} to ${MAX_README_CHARS} chars`);
+  }
 
   const prompt = getProductDocsStructurePrompt(owner, repo, fileTree, readme);
+  console.log(`[ProductDocs] Structure prompt size: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
 
   const messages = [
     {
@@ -311,27 +324,30 @@ async function getProductDocsStructure(owner, repo, repoPath, options = {}) {
 
 /**
  * Generate content for a single wiki page
- * Phase 2: Read relevant files and generate comprehensive documentation
+ * Phase 2: Use RAG to find relevant code chunks and generate documentation
  */
-async function* generatePageContent(repoPath, page, repoUrl, options = {}) {
-  // Read the relevant files
-  const files = await readFilesContent(repoPath, page.filePaths);
+async function* generatePageContent(owner, repo, page, repoUrl, options = {}) {
+  // Use RAG to find relevant chunks
+  const chunks = await getRelevantChunks(owner, repo, page, options);
 
-  if (files.length === 0) {
+  if (chunks.length === 0) {
     yield {
       type: 'content',
-      chunk: `*No relevant files found for this page. Files searched: ${page.filePaths.join(', ')}*`,
+      chunk: `*No relevant content found for this page. Topic: ${page.title}*`,
     };
     return { sources: [] };
   }
 
-  // Build context from files
-  const context = buildFileContext(files);
+  // Build context from RAG chunks
+  const context = buildRagContext(chunks);
+
+  // Get unique file paths from chunks for the prompt
+  const filePaths = [...new Set(chunks.map(c => c.path))];
 
   // Generate page prompt
-  const userPrompt = `${getPageGenerationPrompt(page.title, page.filePaths, repoUrl)}
+  const userPrompt = `${getPageGenerationPrompt(page.title, filePaths, repoUrl)}
 
-Here is the content of the relevant source files:
+Here is the relevant content from the source files (retrieved via semantic search):
 
 ${context}
 
@@ -349,38 +365,49 @@ Generate the wiki page content now.`;
     yield { type: 'content', chunk };
   }
 
-  // Return sources (the files we used)
-  const sources = files.map(f => ({
-    path: f.path,
-    relevance: 1.0, // All files are explicitly requested, so relevance is 1.0
+  // Return sources with relevance scores from RAG
+  const sources = chunks.map(c => ({
+    path: c.path,
+    relevance: 1 - (c.distance || 0), // Convert distance to relevance (lower distance = higher relevance)
   }));
 
-  return { sources };
+  // Deduplicate sources, keeping highest relevance for each path
+  const sourceMap = new Map();
+  for (const source of sources) {
+    if (!sourceMap.has(source.path) || sourceMap.get(source.path).relevance < source.relevance) {
+      sourceMap.set(source.path, source);
+    }
+  }
+
+  return { sources: Array.from(sourceMap.values()) };
 }
 
 /**
  * Generate content for a single product documentation page
- * Phase 2: Read relevant files and generate user-focused documentation
+ * Phase 2: Use RAG to find relevant code chunks and generate user-focused documentation
  */
-async function* generateProductDocsPageContent(repoPath, page, productName, options = {}) {
-  // Read the relevant files
-  const files = await readFilesContent(repoPath, page.filePaths);
+async function* generateProductDocsPageContent(owner, repo, page, productName, options = {}) {
+  // Use RAG to find relevant chunks
+  const chunks = await getRelevantChunks(owner, repo, page, options);
 
-  if (files.length === 0) {
+  if (chunks.length === 0) {
     yield {
       type: 'content',
-      chunk: `*No relevant files found for this page. Files searched: ${page.filePaths.join(', ')}*`,
+      chunk: `*No relevant content found for this page. Topic: ${page.title}*`,
     };
     return { sources: [] };
   }
 
-  // Build context from files
-  const context = buildFileContext(files);
+  // Build context from RAG chunks
+  const context = buildRagContext(chunks);
+
+  // Get unique file paths from chunks for the prompt
+  const filePaths = [...new Set(chunks.map(c => c.path))];
 
   // Generate page prompt using product docs prompt
-  const userPrompt = `${getProductDocsPagePrompt(page.title, page.filePaths, productName)}
+  const userPrompt = `${getProductDocsPagePrompt(page.title, filePaths, productName)}
 
-Here is the content of the relevant source files. Extract the USER-FACING information from these files:
+Here is the relevant content from the source files (retrieved via semantic search). Extract the USER-FACING information:
 
 ${context}
 
@@ -398,13 +425,21 @@ Generate the product documentation page content now. Remember to focus on the EN
     yield { type: 'content', chunk };
   }
 
-  // Return sources (the files we used)
-  const sources = files.map(f => ({
-    path: f.path,
-    relevance: 1.0,
+  // Return sources with relevance scores from RAG
+  const sources = chunks.map(c => ({
+    path: c.path,
+    relevance: 1 - (c.distance || 0),
   }));
 
-  return { sources };
+  // Deduplicate sources
+  const sourceMap = new Map();
+  for (const source of sources) {
+    if (!sourceMap.has(source.path) || sourceMap.get(source.path).relevance < source.relevance) {
+      sourceMap.set(source.path, source);
+    }
+  }
+
+  return { sources: Array.from(sourceMap.values()) };
 }
 
 /**
@@ -422,6 +457,13 @@ Generate the product documentation page content now. Remember to focus on the EN
 export async function* generateWiki(owner, repo, type = 'detailed', options = {}) {
   const repoPath = join(config.reposDir, owner, repo);
   const repoUrl = `https://github.com/${owner}/${repo}`;
+
+  // Check if repository is indexed (required for RAG)
+  const indexed = await isIndexed(owner, repo);
+  if (!indexed) {
+    yield { type: 'error', message: 'Repository must be indexed before generating documentation. Please index the repository first.' };
+    return;
+  }
 
   // Phase 1: Get/Generate structure
   yield { type: 'status', message: 'Analyzing codebase structure...' };
@@ -450,10 +492,10 @@ export async function* generateWiki(owner, repo, type = 'detailed', options = {}
 
     yield { type: 'status', message: `Generating: ${page.title}...` };
 
-    // Generate page content
+    // Generate page content using RAG
     let sources = [];
     try {
-      const generator = generatePageContent(repoPath, page, repoUrl, options);
+      const generator = generatePageContent(owner, repo, page, repoUrl, options);
       let result = await generator.next();
 
       while (!result.done) {
@@ -512,6 +554,13 @@ export async function* generateDetailedWiki(owner, repo, options = {}) {
 export async function* generateProductDocs(owner, repo, options = {}) {
   const repoPath = join(config.reposDir, owner, repo);
 
+  // Check if repository is indexed (required for RAG)
+  const indexed = await isIndexed(owner, repo);
+  if (!indexed) {
+    yield { type: 'error', message: 'Repository must be indexed before generating documentation. Please index the repository first.' };
+    return;
+  }
+
   // Phase 1: Get/Generate structure
   yield { type: 'status', message: 'Analyzing product features and functionality...' };
 
@@ -539,10 +588,10 @@ export async function* generateProductDocs(owner, repo, options = {}) {
 
     yield { type: 'status', message: `Generating: ${page.title}...` };
 
-    // Generate page content
+    // Generate page content using RAG
     let sources = [];
     try {
-      const generator = generateProductDocsPageContent(repoPath, page, structure.title, options);
+      const generator = generateProductDocsPageContent(owner, repo, page, structure.title, options);
       let result = await generator.next();
 
       while (!result.done) {

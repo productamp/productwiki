@@ -32,13 +32,13 @@ export function getEmbeddingsProvider(provider) {
  * Stream chat using the configured or specified provider
  */
 export async function* streamChat(systemPrompt, messages, options = {}) {
-  const { provider, apiKey, model } = options;
+  const { provider, apiKeys, model } = options;
   const llmProvider = getLlmProvider(provider);
 
   if (provider === 'ollama' || (!provider && config.llmProvider === 'ollama')) {
     yield* llmProvider.streamChat(systemPrompt, messages);
   } else {
-    yield* llmProvider.streamChat(systemPrompt, messages, apiKey, model);
+    yield* llmProvider.streamChat(systemPrompt, messages, apiKeys, model);
   }
 }
 
@@ -46,26 +46,26 @@ export async function* streamChat(systemPrompt, messages, options = {}) {
  * Embed text using the configured or specified provider
  */
 export async function embed(text, options = {}) {
-  const { provider, apiKey } = options;
+  const { provider, apiKeys } = options;
   const embeddingsProvider = getEmbeddingsProvider(provider);
 
   if (provider === 'ollama' || (!provider && config.llmProvider === 'ollama')) {
     return embeddingsProvider.embed(text);
   }
-  return embeddingsProvider.embed(text, apiKey);
+  return embeddingsProvider.embed(text, apiKeys);
 }
 
 /**
  * Batch embed texts using the configured or specified provider
  */
 export async function embedBatch(texts, options = {}) {
-  const { provider, apiKey } = options;
+  const { provider, apiKeys } = options;
   const embeddingsProvider = getEmbeddingsProvider(provider);
 
   if (provider === 'ollama' || (!provider && config.llmProvider === 'ollama')) {
     return embeddingsProvider.embedBatch(texts);
   }
-  return embeddingsProvider.embedBatch(texts, apiKey);
+  return embeddingsProvider.embedBatch(texts, apiKeys);
 }
 
 /**
@@ -73,11 +73,11 @@ export async function embedBatch(texts, options = {}) {
  * Returns an async generator that yields { current, total } progress events
  */
 export async function* embedBatchWithProgress(texts, options = {}) {
-  const { provider, apiKey, signal } = options;
+  const { provider, apiKeys, signal } = options;
   const embeddingsProvider = getEmbeddingsProvider(provider);
 
   if (provider === 'ollama' || (!provider && config.llmProvider === 'ollama')) {
     return yield* embeddingsProvider.embedBatchWithProgress(texts, signal);
   }
-  return yield* embeddingsProvider.embedBatchWithProgress(texts, apiKey, signal);
+  return yield* embeddingsProvider.embedBatchWithProgress(texts, apiKeys, signal);
 }

@@ -1,52 +1,8 @@
-import { config } from '../config/index.js';
-import { getAllChunks } from './vectorStore.js';
+/**
+ * RAG-based generation services for documentation, package prompts, and reimplementation
+ */
 import { streamChat } from '../providers/index.js';
-
-/**
- * Priority order for documentation files
- */
-const priorityPatterns = [
-  /readme/i,
-  /index\.(ts|js|tsx|jsx)$/i,
-  /main\.(ts|js|tsx|jsx)$/i,
-  /app\.(ts|js|tsx|jsx)$/i,
-  /config/i,
-  /package\.json$/i,
-  /setup/i,
-  /getting.?started/i,
-  /contributing/i,
-  /api/i,
-];
-
-/**
- * Calculate priority score for a chunk
- */
-function getPriority(chunk) {
-  for (let i = 0; i < priorityPatterns.length; i++) {
-    if (priorityPatterns[i].test(chunk.path)) {
-      return priorityPatterns.length - i;
-    }
-  }
-  return 0;
-}
-
-/**
- * Build context from chunks
- */
-function buildContext(chunks) {
-  // Sort by priority
-  const sortedChunks = chunks.sort((a, b) => getPriority(b) - getPriority(a));
-
-  // Take top N chunks
-  const selectedChunks = sortedChunks.slice(0, config.maxContextChunks);
-
-  // Build context string
-  const contextParts = selectedChunks.map((chunk) => {
-    return `### File: ${chunk.path} (chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks})\n\`\`\`${chunk.extension.replace('.', '')}\n${chunk.content}\n\`\`\``;
-  });
-
-  return contextParts.join('\n\n');
-}
+import { queryRag, buildRagContext, isIndexed } from './ragQuery.js';
 
 /**
  * System prompt for documentation generation
@@ -209,25 +165,32 @@ GUIDELINES FOR THE PROMPT:
 - Keep the prompt focused on functionality, not implementation details`;
 
 /**
- * Generate reimplement prompt for a repository
+ * Generate reimplement prompt for a repository using RAG
  */
 export async function* generateReimplementPrompt(owner, repo, options = {}) {
-  // Get all chunks
-  const chunks = await getAllChunks(owner, repo);
-
-  if (chunks.length === 0) {
+  // Check if repository is indexed
+  if (!(await isIndexed(owner, repo))) {
     yield 'No indexed content found for this repository. Please index the repository first.';
     return;
   }
 
-  // Build context
-  const context = buildContext(chunks);
+  // Use semantic search to find relevant chunks for reimplementation
+  const searchQuery = 'features functionality components user interface state management data flow API routes pages application structure';
+  const chunks = await queryRag(owner, repo, searchQuery, options, 30);
+
+  if (chunks.length === 0) {
+    yield 'No relevant content found for reimplementation analysis.';
+    return;
+  }
+
+  // Build context from RAG results
+  const context = buildRagContext(chunks);
 
   // Create messages
   const messages = [
     {
       role: 'user',
-      content: `Here is the complete codebase of an application:\n\n${context}\n\nPlease analyze this codebase and generate a comprehensive one-shot prompt for Claude Code to reimplement this application using React, Vite, TypeScript, and shadcn/ui.
+      content: `Here is the relevant codebase content of an application (retrieved via semantic search for features, components, and application structure):\n\n${context}\n\nPlease analyze this codebase and generate a comprehensive one-shot prompt for Claude Code to reimplement this application using React, Vite, TypeScript, and shadcn/ui.
 
 Remember:
 - Claude Code will have access to the original codebase alongside your prompt
@@ -246,25 +209,32 @@ Follow the structure outlined in your instructions.`,
 }
 
 /**
- * Generate documentation for a repository
+ * Generate documentation for a repository using RAG
  */
 export async function* generateDocumentation(owner, repo, options = {}) {
-  // Get all chunks
-  const chunks = await getAllChunks(owner, repo);
-
-  if (chunks.length === 0) {
+  // Check if repository is indexed
+  if (!(await isIndexed(owner, repo))) {
     yield 'No indexed content found for this repository. Please index the repository first.';
     return;
   }
 
-  // Build context
-  const context = buildContext(chunks);
+  // Use semantic search to find relevant chunks for documentation
+  const searchQuery = 'project overview architecture components API configuration setup documentation readme main entry point';
+  const chunks = await queryRag(owner, repo, searchQuery, options, 30);
+
+  if (chunks.length === 0) {
+    yield 'No relevant content found for documentation generation.';
+    return;
+  }
+
+  // Build context from RAG results
+  const context = buildRagContext(chunks);
 
   // Create messages
   const messages = [
     {
       role: 'user',
-      content: `Here is the codebase content:\n\n${context}\n\nPlease generate comprehensive technical documentation for this codebase following the structure outlined in your instructions.`,
+      content: `Here is the relevant codebase content (retrieved via semantic search for documentation topics):\n\n${context}\n\nPlease generate comprehensive technical documentation for this codebase following the structure outlined in your instructions.`,
     },
   ];
 
@@ -275,25 +245,32 @@ export async function* generateDocumentation(owner, repo, options = {}) {
 }
 
 /**
- * Generate package/migration prompt for a repository
+ * Generate package/migration prompt for a repository using RAG
  */
 export async function* generatePackagePrompt(owner, repo, options = {}) {
-  // Get all chunks
-  const chunks = await getAllChunks(owner, repo);
-
-  if (chunks.length === 0) {
+  // Check if repository is indexed
+  if (!(await isIndexed(owner, repo))) {
     yield 'No indexed content found for this repository. Please index the repository first.';
     return;
   }
 
-  // Build context
-  const context = buildContext(chunks);
+  // Use semantic search to find relevant chunks for Electron migration
+  const searchQuery = 'electron desktop application architecture configuration build client server API routes database storage environment';
+  const chunks = await queryRag(owner, repo, searchQuery, options, 30);
+
+  if (chunks.length === 0) {
+    yield 'No relevant content found for migration analysis.';
+    return;
+  }
+
+  // Build context from RAG results
+  const context = buildRagContext(chunks);
 
   // Create messages
   const messages = [
     {
       role: 'user',
-      content: `Here is the codebase content of a SaaS web application:\n\n${context}\n\nPlease analyze this codebase and generate a comprehensive one-shot prompt that I can give to Claude Code to migrate this application to an Electron desktop app. Follow the structure outlined in your instructions.`,
+      content: `Here is the relevant codebase content of a SaaS web application (retrieved via semantic search for architecture and configuration):\n\n${context}\n\nPlease analyze this codebase and generate a comprehensive one-shot prompt that I can give to Claude Code to migrate this application to an Electron desktop app. Follow the structure outlined in your instructions.`,
     },
   ];
 

@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RepoConnector } from '@/components/RepoConnector'
-import { SettingsButton } from '@/components/Settings'
-import { ErrorLog } from '@/components/ErrorLog'
-import { getServerLogs, clearServerLogs } from '@/lib/api'
-import { Hexagon } from 'lucide-react'
+import { AppHeader } from '@/components/AppHeader'
 
 interface RepoHistoryItem {
   owner: string
@@ -32,7 +29,6 @@ function formatTimeAgo(dateString: string): string {
 
 export default function HomePage() {
   const [history, setHistory] = useState<RepoHistoryItem[]>([])
-  const [errors, setErrors] = useState<string[]>([])
   const navigate = useNavigate()
 
   const loadHistory = () => {
@@ -46,44 +42,18 @@ export default function HomePage() {
     }
   }
 
-  const loadErrors = async () => {
-    try {
-      const logs = await getServerLogs()
-      setErrors(logs)
-    } catch {
-      // Ignore errors fetching logs
-    }
-  }
-
-  const handleClearErrors = async () => {
-    await clearServerLogs()
-    setErrors([])
-  }
-
   useEffect(() => {
     loadHistory()
-    loadErrors()
-
-    // Poll for errors every 5 seconds
-    const interval = setInterval(loadErrors, 5000)
-    return () => clearInterval(interval)
   }, [])
 
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-2">
-          <Hexagon className="h-5 w-5" />
-          <span className="font-semibold">ProductQ</span>
-        </div>
-        <SettingsButton />
-      </div>
+      <AppHeader />
 
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center px-8 pt-24 pb-8">
         <div className="w-full max-w-md">
-          <RepoConnector onIndexComplete={() => { loadHistory(); loadErrors(); }} />
+          <RepoConnector onIndexComplete={() => loadHistory()} />
         </div>
 
         {/* Recent Products */}
@@ -109,12 +79,6 @@ export default function HomePage() {
           </div>
         )}
       </div>
-
-      {errors.length > 0 && (
-        <div className="fixed bottom-4 right-4 w-96">
-          <ErrorLog errors={errors} onClear={handleClearErrors} />
-        </div>
-      )}
     </div>
   )
 }

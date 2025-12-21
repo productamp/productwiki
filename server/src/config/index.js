@@ -91,6 +91,7 @@ export const config = {
 
   // Embedding settings
   embeddingBatchSize: 100,
+  embeddingConcurrency: 5, // Max parallel embedding requests to avoid connection issues
   embeddingModel: 'text-embedding-004',
   embeddingDimensions: 768,
 
