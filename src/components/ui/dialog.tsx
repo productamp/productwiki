@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 
@@ -11,7 +12,7 @@ interface DialogProps {
 const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
   if (!open) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="fixed inset-0 bg-black/80"
@@ -20,7 +21,8 @@ const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
       <div className="relative z-50">
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
