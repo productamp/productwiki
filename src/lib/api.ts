@@ -3,8 +3,10 @@ const API_KEY_STORAGE_KEY = 'productwiki_api_key'
 const API_KEYS_STORAGE_KEY = 'productwiki_api_keys'
 const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider'
 const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model'
+const PLUS_ACCESS_CODE_KEY = 'productwiki_plus_access_code'
 
 export const DEFAULT_GEMINI_MODEL = 'gemma-3-27b-it'
+const PLUS_ACCESS_CODE = 'plus'
 
 export type LlmProvider = 'gemini' | 'ollama'
 
@@ -142,6 +144,21 @@ export function setGeminiModel(model: string): void {
     localStorage.setItem(GEMINI_MODEL_STORAGE_KEY, model)
   } else {
     localStorage.removeItem(GEMINI_MODEL_STORAGE_KEY)
+  }
+}
+
+export function isPlusUser(): boolean {
+  const storedCode = localStorage.getItem(PLUS_ACCESS_CODE_KEY)
+  return storedCode === PLUS_ACCESS_CODE
+}
+
+export function setPlusAccessCode(code: string): boolean {
+  if (code === PLUS_ACCESS_CODE) {
+    localStorage.setItem(PLUS_ACCESS_CODE_KEY, code)
+    return true
+  } else {
+    localStorage.removeItem(PLUS_ACCESS_CODE_KEY)
+    return false
   }
 }
 

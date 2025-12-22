@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { AppHeader } from '@/components/AppHeader'
 import { IndexingDialog } from '@/components/IndexingDialog'
-import { getProject, type ProjectMetadata } from '@/lib/api'
+import { getProject, isPlusUser, type ProjectMetadata } from '@/lib/api'
 import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Zap, Users, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +15,7 @@ interface Tool {
   description: string
   cacheKey: (owner: string, repo: string) => string
   route: (owner: string, repo: string) => string
+  plusOnly?: boolean
 }
 
 const tools: Tool[] = [
@@ -56,7 +57,8 @@ const tools: Tool[] = [
     icon: Package,
     description: 'Migrate this SaaS to Electron',
     cacheKey: (o, r) => `package_prompt_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/package-prompt`
+    route: (o, r) => `/repo/${o}/${r}/package-prompt`,
+    plusOnly: true
   },
   {
     id: 'reimplement',
@@ -64,7 +66,8 @@ const tools: Tool[] = [
     icon: RefreshCw,
     description: 'Rebuild with React/Vite/shadcn',
     cacheKey: (o, r) => `reimplement_prompt_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/reimplement-prompt`
+    route: (o, r) => `/repo/${o}/${r}/reimplement-prompt`,
+    plusOnly: true
   },
 ]
 
@@ -202,7 +205,7 @@ export default function RepoPage() {
         <div>
           <h2 className="text-sm font-medium text-muted-foreground mb-3">Tools</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {tools.map(tool => {
+            {tools.filter(tool => !tool.plusOnly || isPlusUser()).map(tool => {
               const Icon = tool.icon
               const isGenerated = generatedTools.has(tool.id)
               return (

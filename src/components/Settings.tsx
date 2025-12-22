@@ -8,8 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Settings as SettingsIcon, Check, Plus, X } from 'lucide-react'
-import { getApiKeyEntries, setApiKeyEntries, getProvider, setProvider, getGeminiModel, setGeminiModel, DEFAULT_GEMINI_MODEL, type LlmProvider, type ApiKeyEntry } from '@/lib/api'
+import { Settings as SettingsIcon, Check, Plus, X, Crown } from 'lucide-react'
+import { getApiKeyEntries, setApiKeyEntries, getProvider, setProvider, getGeminiModel, setGeminiModel, isPlusUser, setPlusAccessCode, DEFAULT_GEMINI_MODEL, type LlmProvider, type ApiKeyEntry } from '@/lib/api'
 
 interface SettingsProps {
   open: boolean
@@ -20,6 +20,8 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
   const [apiKeys, setApiKeysState] = useState<ApiKeyEntry[]>([{ key: '', label: '' }])
   const [provider, setProviderState] = useState<LlmProvider>('gemini')
   const [geminiModel, setGeminiModelState] = useState(DEFAULT_GEMINI_MODEL)
+  const [plusAccessCode, setPlusAccessCodeState] = useState('')
+  const [isPlusActive, setIsPlusActive] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -28,6 +30,8 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
       setApiKeysState(entries.length > 0 ? entries : [{ key: '', label: '' }])
       setProviderState(getProvider())
       setGeminiModelState(getGeminiModel())
+      setIsPlusActive(isPlusUser())
+      setPlusAccessCodeState('')
       setSaved(false)
     }
   }, [open])
@@ -43,6 +47,13 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
     setApiKeyEntries(filtered)
     setProvider(provider)
     setGeminiModel(geminiModel)
+
+    // Handle Plus access code
+    if (plusAccessCode.trim()) {
+      const success = setPlusAccessCode(plusAccessCode.trim())
+      setIsPlusActive(success)
+    }
+
     setSaved(true)
     setTimeout(() => {
       onOpenChange(false)
@@ -189,6 +200,27 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
               </p>
             </div>
           )}
+
+          <div className="space-y-2 pt-4 border-t">
+            <div className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-primary" />
+              <label className="text-sm font-medium">Plus Access</label>
+              {isPlusActive && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  Active
+                </span>
+              )}
+            </div>
+            <Input
+              type="password"
+              placeholder="Enter access code"
+              value={plusAccessCode}
+              onChange={(e) => setPlusAccessCodeState(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter your Plus access code to unlock Package Prompt and Reimplement tools
+            </p>
+          </div>
 
           <Button onClick={handleSave} className="w-full">
             {saved ? (
