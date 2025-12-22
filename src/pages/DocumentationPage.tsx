@@ -3,11 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
-import { NotificationDropdown } from '@/components/NotificationDropdown'
-import { SettingsButton } from '@/components/Settings'
+import { AppHeader } from '@/components/AppHeader'
 import { getProject, generateDocs, JobIds, type ProjectMetadata } from '@/lib/api'
 import { useSimpleJobReconnection } from '@/hooks/useJobReconnection'
-import { Loader2, ArrowLeft, BookOpen, Copy, Check, AlertTriangle, RotateCw, Info } from 'lucide-react'
+import { Loader2, Copy, Check, AlertTriangle, RotateCw } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -116,42 +115,18 @@ export default function DocumentationPage() {
 
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="max-w-6xl mx-auto px-8 py-4">
-          <div className="flex items-center gap-4">
-          <Link to={`/repo/${owner}/${repo}`}>
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BookOpen className="h-6 w-6" />
-              Technical Documentation
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs">
-                    <p>Comprehensive technical documentation generated from the codebase analysis. Includes architecture overview, key components, data flow, and API reference.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {owner}/{repo}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <AppHeader
+        title={`${owner}/${repo}`}
+        subtitle="Quick Documentation"
+        actions={
+          <>
             {docs && !generating && (
               <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
                 <RotateCw className="h-4 w-4" />
               </Button>
             )}
             {docs && (
-              <Button onClick={handleCopy} variant="outline">
+              <Button onClick={handleCopy} variant="outline" size="sm">
                 {copied ? (
                   <>
                     <Check className="mr-2 h-4 w-4" />
@@ -165,12 +140,9 @@ export default function DocumentationPage() {
                 )}
               </Button>
             )}
-            <NotificationDropdown />
-            <SettingsButton />
-          </div>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Content */}
       <div className="max-w-6xl mx-auto px-8 py-6 space-y-6">

@@ -3,8 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
-import { NotificationDropdown } from '@/components/NotificationDropdown'
-import { SettingsButton } from '@/components/Settings'
+import { AppHeader } from '@/components/AppHeader'
 import {
   getProject,
   generateBriefWiki,
@@ -18,8 +17,6 @@ import {
 import { useWikiJobReconnection } from '@/hooks/useJobReconnection'
 import {
   Loader2,
-  ArrowLeft,
-  BookOpen,
   Copy,
   Check,
   AlertTriangle,
@@ -290,50 +287,34 @@ export default function WikiPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-background flex items-center gap-4 p-4 border-b">
-        <Link to={`/repo/${owner}/${repo}`}>
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            {structure?.title || `${owner}/${repo}`}
-            <span className="text-sm font-normal text-muted-foreground ml-2">
-              ({wikiType === 'brief' ? 'Brief' : 'Detailed'})
-            </span>
-          </h1>
-          {structure?.description && (
-            <p className="text-sm text-muted-foreground">{structure.description}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {structure && !generating && !reconnecting && (
-            <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
-              <RotateCw className="h-4 w-4" />
-            </Button>
-          )}
-          {structure && (
-            <Button onClick={handleCopy} variant="outline">
-              {copied ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy
-                </>
-              )}
-            </Button>
-          )}
-          <NotificationDropdown />
-          <SettingsButton />
-        </div>
-      </div>
+      <AppHeader
+        title={`${owner}/${repo}`}
+        subtitle="Technical Documentation"
+        actions={
+          <>
+            {structure && !generating && !reconnecting && (
+              <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
+                <RotateCw className="h-4 w-4" />
+              </Button>
+            )}
+            {structure && (
+              <Button onClick={handleCopy} variant="outline" size="sm">
+                {copied ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Embedding compatibility warning */}
       {project?.embeddingCompatibility && !project.embeddingCompatibility.compatible && (
