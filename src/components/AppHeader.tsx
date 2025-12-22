@@ -38,8 +38,11 @@ export function AppHeader({ title, titleHref, subtitle, actions }: AppHeaderProp
           </>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
         {actions}
+        <Link to="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          About
+        </Link>
         <NotificationDropdown />
         <SettingsButton />
       </div>
