@@ -169,9 +169,11 @@ export async function* indexRepositoryWithProgress(
   }
 
   // Store in vector database
-  yield { phase: 'store', status: 'started' };
-  await storeEmbeddings(owner, repo, chunksWithVectors);
-  yield { phase: 'store', status: 'completed' };
+  yield { phase: 'store', status: 'started', progress: { current: 0, total: chunksWithVectors.length } };
+  await storeEmbeddings(owner, repo, chunksWithVectors, (current, total) => {
+    // Note: We can't yield here since we're in a callback, but the console logs help debugging
+  });
+  yield { phase: 'store', status: 'completed', progress: { current: chunksWithVectors.length, total: chunksWithVectors.length } };
 
   // Save metadata
   const metadata = {

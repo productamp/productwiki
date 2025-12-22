@@ -89,7 +89,8 @@ export async function isIndexed(owner: string, repo: string): Promise<boolean> {
 export async function storeEmbeddings(
   owner: string,
   repo: string,
-  chunks: Chunk[]
+  chunks: Chunk[],
+  onProgress?: (current: number, total: number) => void
 ): Promise<void> {
   const idx = getIndex();
 
@@ -106,30 +107,53 @@ export async function storeEmbeddings(
     console.log('[VectorStore] No existing vectors to delete or filter not supported');
   }
 
-  // Upsert in batches (Upstash limit: 1000 vectors per request)
-  const BATCH_SIZE = 1000;
-  console.log(`[VectorStore] Storing ${chunks.length} chunks in batches of ${BATCH_SIZE}...`);
+  // Upsert in batches with parallel processing for speed
+  const BATCH_SIZE = 200;
+  const PARALLEL_BATCHES = 3; // Process 3 batches in parallel
+  const totalBatches = Math.ceil(chunks.length / BATCH_SIZE);
+  console.log(`[VectorStore] Storing ${chunks.length} chunks in ${totalBatches} batches (${PARALLEL_BATCHES} parallel)...`);
 
-  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-    const batch = chunks.slice(i, i + BATCH_SIZE);
+  let completed = 0;
 
-    const vectors = batch.map((chunk) => ({
-      id: getVectorId(owner, repo, chunk.id),
-      vector: chunk.vector,
-      metadata: {
-        owner,
-        repo,
-        path: chunk.path,
-        content: chunk.content,
-        chunkIndex: chunk.chunkIndex,
-        totalChunks: chunk.totalChunks,
-        extension: chunk.extension,
-        type: 'chunk',
-      },
-    }));
+  for (let i = 0; i < chunks.length; i += BATCH_SIZE * PARALLEL_BATCHES) {
+    // Create parallel batch promises
+    const batchPromises = [];
 
-    await idx.upsert(vectors);
-    console.log(`[VectorStore] Stored batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}`);
+    for (let j = 0; j < PARALLEL_BATCHES; j++) {
+      const batchStart = i + (j * BATCH_SIZE);
+      if (batchStart >= chunks.length) break;
+
+      const batch = chunks.slice(batchStart, batchStart + BATCH_SIZE);
+      const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
+
+      const vectors = batch.map((chunk) => ({
+        id: getVectorId(owner, repo, chunk.id),
+        vector: chunk.vector,
+        metadata: {
+          owner,
+          repo,
+          path: chunk.path,
+          content: chunk.content,
+          chunkIndex: chunk.chunkIndex,
+          totalChunks: chunk.totalChunks,
+          extension: chunk.extension,
+          type: 'chunk',
+        },
+      }));
+
+      batchPromises.push(
+        idx.upsert(vectors).then(() => {
+          completed += batch.length;
+          console.log(`[VectorStore] Stored batch ${batchNum}/${totalBatches} (${completed}/${chunks.length} chunks)`);
+          if (onProgress) {
+            onProgress(completed, chunks.length);
+          }
+        })
+      );
+    }
+
+    // Wait for all parallel batches to complete
+    await Promise.all(batchPromises);
   }
 
   console.log(`[VectorStore] Successfully stored ${chunks.length} chunks for ${owner}/${repo}`);
