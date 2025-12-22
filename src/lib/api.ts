@@ -4,7 +4,7 @@ const API_KEYS_STORAGE_KEY = 'productwiki_api_keys'
 const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider'
 const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model'
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview'
+export const DEFAULT_GEMINI_MODEL = 'gemma-3-27b-it'
 
 export type LlmProvider = 'gemini' | 'ollama'
 
