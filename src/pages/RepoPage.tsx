@@ -37,11 +37,12 @@ const tools: Tool[] = [
   },
   {
     id: 'docs',
-    name: 'Documentation (Legacy)',
+    name: 'Quick Documentation',
     icon: BookOpen,
     description: 'Single-page technical documentation',
     cacheKey: (o, r) => `docs_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/documentation`
+    route: (o, r) => `/repo/${o}/${r}/documentation`,
+    plusOnly: true
   },
   {
     id: 'package',

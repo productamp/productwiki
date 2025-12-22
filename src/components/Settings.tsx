@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Settings as SettingsIcon, Check, Plus, X, Crown, Package, RefreshCw } from 'lucide-react'
+import { Settings as SettingsIcon, Check, Plus, X, Crown, Package, RefreshCw, BookOpen } from 'lucide-react'
 import { getApiKeyEntries, setApiKeyEntries, getProvider, setProvider, getGeminiModel, setGeminiModel, isPlusUser, setPlusAccessCode, DEFAULT_GEMINI_MODEL, type LlmProvider, type ApiKeyEntry } from '@/lib/api'
 
 interface SettingsProps {
@@ -258,6 +258,10 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                     <div className="p-4 bg-muted/50 rounded-lg border">
                       <h4 className="text-sm font-medium mb-2">Premium Features</h4>
                       <ul className="space-y-1.5 text-sm text-muted-foreground">
+                        <li className="flex items-center gap-2">
+                          <BookOpen className="h-3.5 w-3.5" />
+                          Quick Documentation - Single-page technical docs
+                        </li>
                         <li className="flex items-center gap-2">
                           <Package className="h-3.5 w-3.5" />
                           Package Prompt - Migrate SaaS to Electron
