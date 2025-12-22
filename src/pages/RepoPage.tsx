@@ -21,7 +21,7 @@ interface Tool {
 const tools: Tool[] = [
   {
     id: 'product-docs',
-    name: 'Product Docs',
+    name: 'Product Documentation',
     icon: Users,
     description: 'End-user focused documentation with features and workflows',
     cacheKey: (o, r) => `product_docs_${o}_${r}`,
