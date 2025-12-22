@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card'
 import { AppHeader } from '@/components/AppHeader'
 import { IndexingDialog } from '@/components/IndexingDialog'
 import { getProject, isPlusUser, type ProjectMetadata } from '@/lib/api'
-import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Zap, Users, type LucideIcon } from 'lucide-react'
+import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Users, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Tool {
@@ -19,14 +19,6 @@ interface Tool {
 }
 
 const tools: Tool[] = [
-  {
-    id: 'wiki-brief',
-    name: 'Quick Wiki',
-    icon: Zap,
-    description: 'Generate a brief wiki with overview and quickstart',
-    cacheKey: (o, r) => `wiki_brief_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/wiki/brief`
-  },
   {
     id: 'wiki-detailed',
     name: 'Full Wiki',
