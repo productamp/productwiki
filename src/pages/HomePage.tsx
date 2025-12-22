@@ -75,34 +75,11 @@ export default function HomePage() {
           }} />
         </div>
 
-        {/* Recent Products */}
-        {history.length > 0 && (
-          <div className="w-full max-w-md mt-16">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">
-              Your Recent
-            </p>
-            <div className="space-y-2">
-              {history.slice(0, 5).map((item) => (
-                <button
-                  key={`${item.owner}/${item.repo}`}
-                  onClick={() => navigate(`/repo/${item.owner}/${item.repo}`)}
-                  className="w-full p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors text-left"
-                >
-                  <span className="font-medium">{item.owner}/{item.repo}</span>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Indexed {formatTimeAgo(item.indexedAt)}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* All Available Repositories */}
+        {/* All Repositories */}
         {allProjects.length > 0 && (
           <div className="w-full max-w-md mt-16">
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">
-              All Available Repositories
+              All Repositories
             </p>
             {loading ? (
               <div className="text-center text-muted-foreground py-8">
@@ -110,22 +87,35 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {allProjects.map((project) => (
-                  <button
-                    key={`${project.owner}/${project.repo}`}
-                    onClick={() => navigate(`/repo/${project.owner}/${project.repo}`)}
-                    className="w-full p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors text-left"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <span className="font-medium">{project.owner}/{project.repo}</span>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {project.chunkCount.toLocaleString()} chunks • Indexed {formatTimeAgo(project.indexedAt)}
-                        </p>
+                {allProjects.map((project) => {
+                  const isRecent = history.some(
+                    (h) => h.owner === project.owner && h.repo === project.repo
+                  )
+
+                  return (
+                    <button
+                      key={`${project.owner}/${project.repo}`}
+                      onClick={() => navigate(`/repo/${project.owner}/${project.repo}`)}
+                      className="w-full p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{project.owner}/{project.repo}</span>
+                            {isRecent && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                Recently Used
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {project.chunkCount.toLocaleString()} chunks • Indexed {formatTimeAgo(project.indexedAt)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
