@@ -195,8 +195,8 @@ export async function searchSimilar(
 export async function getAllChunks(owner: string, repo: string): Promise<SearchResult[]> {
   const idx = getIndex();
 
-  // Query with a zero vector to get all matching vectors
-  const dummyVector = new Array(config.embeddingDimensions).fill(0);
+  // Query with a non-zero dummy vector to get all matching vectors
+  const dummyVector = new Array(config.embeddingDimensions).fill(0.001);
 
   const results = await idx.query({
     vector: dummyVector,
@@ -239,8 +239,8 @@ export async function saveProjectMetadata(
 ): Promise<void> {
   const idx = getIndex();
 
-  // Use a dummy vector for metadata storage
-  const dummyVector = new Array(config.embeddingDimensions).fill(0);
+  // Use a non-zero dummy vector for metadata storage (to avoid cosine similarity issues)
+  const dummyVector = new Array(config.embeddingDimensions).fill(0.001);
 
   await idx.upsert([{
     id: `${owner}_${repo}_metadata`,
@@ -296,7 +296,7 @@ export async function getProjectMetadata(
 export async function listProjects(): Promise<ProjectMetadata[]> {
   try {
     const idx = getIndex();
-    const dummyVector = new Array(config.embeddingDimensions).fill(0);
+    const dummyVector = new Array(config.embeddingDimensions).fill(0.001);
 
     // Query for all metadata entries
     const results = await idx.query({
