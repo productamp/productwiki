@@ -20,20 +20,20 @@ interface Tool {
 
 const tools: Tool[] = [
   {
-    id: 'wiki-detailed',
-    name: 'Full Wiki',
-    icon: FileText,
-    description: 'Generate comprehensive multi-page documentation',
-    cacheKey: (o, r) => `wiki_detailed_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/wiki/detailed`
-  },
-  {
     id: 'product-docs',
     name: 'Product Docs',
     icon: Users,
     description: 'End-user focused documentation with features and workflows',
     cacheKey: (o, r) => `product_docs_${o}_${r}`,
     route: (o, r) => `/repo/${o}/${r}/product-docs`
+  },
+  {
+    id: 'wiki-detailed',
+    name: 'Full Wiki',
+    icon: FileText,
+    description: 'Generate comprehensive multi-page documentation',
+    cacheKey: (o, r) => `wiki_detailed_${o}_${r}`,
+    route: (o, r) => `/repo/${o}/${r}/wiki/detailed`
   },
   {
     id: 'docs',
