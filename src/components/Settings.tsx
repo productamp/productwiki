@@ -4,9 +4,6 @@ import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog'
 import { Settings as SettingsIcon, Check, Plus, X, Crown, Package, RefreshCw, BookOpen } from 'lucide-react'
 import { getApiKeyEntries, setApiKeyEntries, getProvider, setProvider, getGeminiModel, setGeminiModel, isPlusUser, setPlusAccessCode, DEFAULT_GEMINI_MODEL, type LlmProvider, type ApiKeyEntry } from '@/lib/api'

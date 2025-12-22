@@ -6,13 +6,7 @@ import { DocumentationViewer } from '@/components/DocumentationViewer'
 import { AppHeader } from '@/components/AppHeader'
 import { getProject, generateDocs, JobIds, type ProjectMetadata } from '@/lib/api'
 import { useSimpleJobReconnection } from '@/hooks/useJobReconnection'
-import { Loader2, Copy, Check, AlertTriangle, RotateCw } from 'lucide-react'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Loader2, Copy, Check, AlertTriangle, RotateCw, ArrowLeft } from 'lucide-react'
 
 export default function DocumentationPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()

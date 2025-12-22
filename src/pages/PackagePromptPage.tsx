@@ -6,7 +6,7 @@ import { DocumentationViewer } from '@/components/DocumentationViewer'
 import { AppHeader } from '@/components/AppHeader'
 import { getProject, generatePackagePrompt, JobIds, type ProjectMetadata } from '@/lib/api'
 import { useSimpleJobReconnection } from '@/hooks/useJobReconnection'
-import { Loader2, Copy, Check, RotateCw } from 'lucide-react'
+import { Loader2, Copy, Check, RotateCw, ArrowLeft } from 'lucide-react'
 
 export default function PackagePromptPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()

@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   RotateCw,
   FileText,
+  ArrowLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -345,10 +346,10 @@ export default function WikiPage() {
       )}
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-y-auto md:overflow-hidden">
         {/* Sidebar */}
         {structure && (
-          <div className="w-64 border-r overflow-y-auto h-[calc(100vh-8rem)]">
+          <div className="w-full md:w-64 md:border-r md:fixed md:top-[4rem] md:bottom-0 md:overflow-y-auto">
             <div className="p-4 space-y-2">
               {structure.pages.map(page => {
                 const pageState = wikiState[page.id]
@@ -387,7 +388,7 @@ export default function WikiPage() {
         )}
 
         {/* Content area */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 md:ml-64 md:overflow-y-auto">
           <div ref={contentRef} className="p-6 max-w-4xl mx-auto">
             {!structure && !generating && (
               <div className="text-center py-12">
@@ -398,19 +399,6 @@ export default function WikiPage() {
 
             {structure && currentPageData && (
               <div className="space-y-6" id={`page-${activePage}`}>
-                {/* Page title and description */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h2 className="text-2xl font-bold">{currentPageData.title}</h2>
-                    {currentPageState?.status === 'generating' && (
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    )}
-                  </div>
-                  {currentPageData.description && (
-                    <p className="text-muted-foreground">{currentPageData.description}</p>
-                  )}
-                </div>
-
                 {/* Page content */}
                 {currentPageState?.status === 'pending' && (
                   <div className="space-y-4">
@@ -433,7 +421,7 @@ export default function WikiPage() {
 
                 {(currentPageState?.status === 'generating' || currentPageState?.status === 'complete') && (
                   <MarkdownRenderer
-                    content={currentPageState.content || ''}
+                    content={(currentPageState.content || '').replace(/<details>[\s\S]*?<\/details>\s*/g, '')}
                     className="prose-sm"
                   />
                 )}
