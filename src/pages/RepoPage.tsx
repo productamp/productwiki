@@ -160,10 +160,13 @@ export default function RepoPage() {
           <div>
             <h2 className="text-sm font-medium text-muted-foreground mb-3">Repository Details</h2>
             <Card className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-                  <span className="font-medium">Indexed</span>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">{owner}/{repo}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+                    <span className="font-medium">Indexed</span>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   {project.url && (
