@@ -86,8 +86,8 @@ export const config = {
   maxFileSize: 1024 * 1024,
 
   // Embedding settings - Google text-embedding-004
-  embeddingBatchSize: 100,
-  embeddingConcurrency: 5,
+  embeddingBatchSize: 25,
+  embeddingConcurrency: 15,
   embeddingModel: 'text-embedding-004',
   embeddingDimensions: 768,
 

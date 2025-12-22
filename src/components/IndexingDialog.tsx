@@ -73,7 +73,7 @@ export function IndexingDialog({
       setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000))
     }, 100)
 
-    // Start indexing
+    // Start indexing with SSE streaming
     abortControllerRef.current = new AbortController()
     const runIndexing = async () => {
       try {

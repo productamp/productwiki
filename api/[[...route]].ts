@@ -8,8 +8,10 @@ import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 
 // Import services
-import { indexRepositoryWithProgress, IndexProgress } from './_lib/indexer.js';
-import { isIndexed, listProjects, getProjectMetadata } from './_lib/vectorStore.js';
+import { indexRepositoryWithProgress, IndexProgress, chunkDocument } from './_lib/indexer.js';
+import { isIndexed, listProjects, getProjectMetadata, storeEmbeddings, saveProjectMetadata } from './_lib/vectorStore.js';
+import { processRepository } from './_lib/github.js';
+import { embedBatch } from './_lib/embeddings.js';
 import { generateDocumentation, generatePackagePrompt, generateReimplementPrompt } from './_lib/rag.js';
 import {
   generateBriefWiki,
@@ -107,6 +109,128 @@ app.post('/index', async (c) => {
       }
     }
   });
+});
+
+// Prepare index (fetch + chunk) - for client-side batching
+app.post('/index-prepare', async (c) => {
+  const { url } = await c.req.json<{ url: string }>();
+
+  if (!url) {
+    return c.json({ error: 'URL is required' }, 400);
+  }
+
+  try {
+    // Fetch and chunk repository
+    const { owner, repo, files, branch } = await processRepository(url);
+    const allChunks = [];
+
+    for (const file of files) {
+      const chunks = chunkDocument(file);
+      allChunks.push(...chunks);
+    }
+
+    return c.json({
+      owner,
+      repo,
+      branch,
+      url,
+      fileCount: files.length,
+      chunks: allChunks.map(chunk => ({
+        id: chunk.id,
+        path: chunk.path,
+        content: chunk.content,
+        chunkIndex: chunk.chunkIndex,
+        totalChunks: chunk.totalChunks,
+        extension: chunk.extension,
+      })),
+    });
+  } catch (err) {
+    console.error('Prepare index error:', err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
+});
+
+// Embed batch (small batch for client-side batching)
+app.post('/embed-batch', async (c) => {
+  const { owner, repo, chunks } = await c.req.json<{
+    owner: string;
+    repo: string;
+    chunks: Array<{
+      id: string;
+      path: string;
+      content: string;
+      chunkIndex: number;
+      totalChunks: number;
+      extension: string;
+    }>;
+  }>();
+
+  if (!owner || !repo || !chunks || chunks.length === 0) {
+    return c.json({ error: 'owner, repo, and chunks are required' }, 400);
+  }
+
+  if (chunks.length > 50) {
+    return c.json({ error: 'Max 50 chunks per batch' }, 400);
+  }
+
+  try {
+    // Embed chunks
+    const texts = chunks.map(c => c.content);
+    const embeddings = await embedBatch(texts, c.get('apiKeys') as (string | KeyEntry)[]);
+
+    // Attach vectors and store
+    const chunksWithVectors = chunks.map((chunk, i) => ({
+      ...chunk,
+      vector: embeddings[i],
+    }));
+
+    await storeEmbeddings(owner, repo, chunksWithVectors);
+
+    return c.json({ success: true, processed: chunks.length });
+  } catch (err) {
+    console.error('Embed batch error:', err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
+});
+
+// Complete index (save metadata) - for client-side batching
+app.post('/index-complete', async (c) => {
+  const { owner, repo, url, branch, fileCount, chunkCount } = await c.req.json<{
+    owner: string;
+    repo: string;
+    url: string;
+    branch: string;
+    fileCount: number;
+    chunkCount: number;
+  }>();
+
+  if (!owner || !repo) {
+    return c.json({ error: 'owner and repo are required' }, 400);
+  }
+
+  try {
+    const metadata = {
+      owner,
+      repo,
+      url,
+      branch,
+      indexedAt: new Date().toISOString(),
+      fileCount,
+      chunkCount,
+      embedding: {
+        provider: 'gemini',
+        model: config.embeddingModel,
+        dimensions: config.embeddingDimensions,
+      },
+    };
+
+    await saveProjectMetadata(owner, repo, metadata);
+
+    return c.json({ success: true, metadata });
+  } catch (err) {
+    console.error('Complete index error:', err);
+    return c.json({ error: (err as Error).message }, 500);
+  }
 });
 
 // Check index status

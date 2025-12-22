@@ -178,6 +178,24 @@ export type IndexProgress =
   | { phase: 'cancelled' }
   | { phase: 'done' }
 
+export interface ChunkData {
+  id: string
+  path: string
+  content: string
+  chunkIndex: number
+  totalChunks: number
+  extension: string
+}
+
+export interface PrepareIndexResponse {
+  owner: string
+  repo: string
+  branch: string
+  url: string
+  fileCount: number
+  chunks: ChunkData[]
+}
+
 export async function* indexRepoStream(
   url: string,
   signal?: AbortSignal
@@ -247,6 +265,101 @@ export async function indexRepo(url: string): Promise<ProjectMetadata> {
   }
 
   return metadata
+}
+
+// Client-side batching functions for Vercel Free tier
+
+export async function prepareIndex(url: string): Promise<PrepareIndexResponse> {
+  const response = await fetch(`${BASE_URL}/index-prepare`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ url }),
+  })
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to prepare index'
+    try {
+      const contentType = response.headers.get('content-type')
+      if (contentType?.includes('application/json')) {
+        const error = await response.json()
+        errorMessage = error.error || errorMessage
+      } else {
+        const text = await response.text()
+        errorMessage = text.substring(0, 200) || errorMessage
+      }
+    } catch (e) {
+      // If parsing fails, use default message
+      errorMessage = 'Failed to prepare index - server returned invalid response'
+    }
+    throw new Error(errorMessage)
+  }
+
+  return response.json()
+}
+
+export async function embedBatchAPI(
+  owner: string,
+  repo: string,
+  chunks: ChunkData[]
+): Promise<{ success: boolean; processed: number }> {
+  const response = await fetch(`${BASE_URL}/embed-batch`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ owner, repo, chunks }),
+  })
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to embed batch'
+    try {
+      const contentType = response.headers.get('content-type')
+      if (contentType?.includes('application/json')) {
+        const error = await response.json()
+        errorMessage = error.error || errorMessage
+      } else {
+        const text = await response.text()
+        errorMessage = text.substring(0, 200) || errorMessage
+      }
+    } catch (e) {
+      errorMessage = 'Failed to embed batch - server returned invalid response'
+    }
+    throw new Error(errorMessage)
+  }
+
+  return response.json()
+}
+
+export async function completeIndex(data: {
+  owner: string
+  repo: string
+  url: string
+  branch: string
+  fileCount: number
+  chunkCount: number
+}): Promise<{ success: boolean; metadata: ProjectMetadata }> {
+  const response = await fetch(`${BASE_URL}/index-complete`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  })
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to complete index'
+    try {
+      const contentType = response.headers.get('content-type')
+      if (contentType?.includes('application/json')) {
+        const error = await response.json()
+        errorMessage = error.error || errorMessage
+      } else {
+        const text = await response.text()
+        errorMessage = text.substring(0, 200) || errorMessage
+      }
+    } catch (e) {
+      errorMessage = 'Failed to complete index - server returned invalid response'
+    }
+    throw new Error(errorMessage)
+  }
+
+  return response.json()
 }
 
 export async function getProjects(): Promise<ProjectMetadata[]> {

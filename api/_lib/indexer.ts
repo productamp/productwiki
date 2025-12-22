@@ -27,7 +27,7 @@ function splitIntoWords(text: string): string[] {
 /**
  * Chunk a document into overlapping pieces
  */
-function chunkDocument(doc: GitHubFile): ChunkData[] {
+export function chunkDocument(doc: GitHubFile): ChunkData[] {
   const words = splitIntoWords(doc.content);
   const chunks: ChunkData[] = [];
 
