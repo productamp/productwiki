@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:3847'
+const BASE_URL = import.meta.env.VITE_API_URL || window.location.origin
 const API_KEY_STORAGE_KEY = 'productwiki_api_key'
 const API_KEYS_STORAGE_KEY = 'productwiki_api_keys'
 const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider'
