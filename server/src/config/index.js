@@ -95,7 +95,7 @@ export const config = {
   embeddingDimensions: 768,
 
   // LLM settings
-  llmModel: 'gemini-3-flash-preview',
+  llmModel: 'gemma-3-27b-it',
   maxContextChunks: 100,
 
   // RAG settings for wiki generation
