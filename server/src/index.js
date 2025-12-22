@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
@@ -53,13 +54,19 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Register routes
+// Register API routes
 app.route('/', indexRoutes);
 app.route('/', projectsRoutes);
 app.route('/', generateRoutes);
 app.route('/', wikiRoutes);
 app.route('/', logsRoutes);
 app.route('/', jobsRoutes);
+
+// Serve static files from dist directory
+app.use('/*', serveStatic({ root: '../dist' }));
+
+// Fallback to index.html for client-side routing
+app.get('*', serveStatic({ path: '../dist/index.html' }));
 
 // Start server
 serve({

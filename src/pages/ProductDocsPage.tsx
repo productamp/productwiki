@@ -3,8 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
-import { NotificationDropdown } from '@/components/NotificationDropdown'
-import { SettingsButton } from '@/components/Settings'
+import { AppHeader } from '@/components/AppHeader'
 import {
   getProject,
   generateProductDocs,
@@ -17,13 +16,12 @@ import {
 import { useWikiJobReconnection } from '@/hooks/useJobReconnection'
 import {
   Loader2,
-  ArrowLeft,
-  Users,
   Copy,
   Check,
   AlertTriangle,
   RotateCw,
   FileText,
+  ArrowLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -282,50 +280,35 @@ export default function ProductDocsPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-background flex items-center gap-4 p-4 border-b">
-        <Link to={`/repo/${owner}/${repo}`}>
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            {structure?.title || `${owner}/${repo}`}
-            <span className="text-sm font-normal text-muted-foreground ml-2">
-              (Product Documentation)
-            </span>
-          </h1>
-          {structure?.description && (
-            <p className="text-sm text-muted-foreground">{structure.description}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {structure && !generating && !reconnecting && (
-            <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
-              <RotateCw className="h-4 w-4" />
-            </Button>
-          )}
-          {structure && (
-            <Button onClick={handleCopy} variant="outline">
-              {copied ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy
-                </>
-              )}
-            </Button>
-          )}
-          <NotificationDropdown />
-          <SettingsButton />
-        </div>
-      </div>
+      <AppHeader
+        title={`${owner}/${repo}`}
+        titleHref={`/repo/${owner}/${repo}`}
+        subtitle="Product Documentation"
+        actions={
+          <>
+            {structure && !generating && !reconnecting && (
+              <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
+                <RotateCw className="h-4 w-4" />
+              </Button>
+            )}
+            {structure && (
+              <Button onClick={handleCopy} variant="outline" size="sm">
+                {copied ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Embedding compatibility warning */}
       {project?.embeddingCompatibility && !project.embeddingCompatibility.compatible && (
@@ -355,10 +338,10 @@ export default function ProductDocsPage() {
       )}
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-y-auto md:overflow-hidden">
         {/* Sidebar */}
         {structure && (
-          <div className="w-64 border-r overflow-y-auto h-[calc(100vh-8rem)]">
+          <div className="w-full md:w-64 md:border-r md:fixed md:top-[4rem] md:bottom-0 md:overflow-y-auto">
             <div className="p-4 space-y-2">
               {structure.pages.map(page => {
                 const pageState = wikiState[page.id]
@@ -397,7 +380,7 @@ export default function ProductDocsPage() {
         )}
 
         {/* Content area */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 md:ml-64 md:overflow-y-auto">
           <div ref={contentRef} className="p-6 max-w-4xl mx-auto">
             {!structure && !generating && (
               <div className="text-center py-12">
@@ -408,19 +391,6 @@ export default function ProductDocsPage() {
 
             {structure && currentPageData && (
               <div className="space-y-6" id={`page-${activePage}`}>
-                {/* Page title and description */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h2 className="text-2xl font-bold">{currentPageData.title}</h2>
-                    {currentPageState?.status === 'generating' && (
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    )}
-                  </div>
-                  {currentPageData.description && (
-                    <p className="text-muted-foreground">{currentPageData.description}</p>
-                  )}
-                </div>
-
                 {/* Page content */}
                 {currentPageState?.status === 'pending' && (
                   <div className="space-y-4">
@@ -443,7 +413,7 @@ export default function ProductDocsPage() {
 
                 {(currentPageState?.status === 'generating' || currentPageState?.status === 'complete') && (
                   <MarkdownRenderer
-                    content={currentPageState.content || ''}
+                    content={(currentPageState.content || '').replace(/<details>[\s\S]*?<\/details>\s*/g, '')}
                     className="prose-sm"
                   />
                 )}

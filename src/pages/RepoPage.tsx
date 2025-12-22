@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { AppHeader } from '@/components/AppHeader'
 import { IndexingDialog } from '@/components/IndexingDialog'
-import { getProject, type ProjectMetadata } from '@/lib/api'
-import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Zap, Users, type LucideIcon } from 'lucide-react'
+import { getProject, isPlusUser, type ProjectMetadata } from '@/lib/api'
+import { Loader2, ExternalLink, ArrowLeft, BookOpen, Package, RefreshCw, RotateCw, Check, FileText, Users, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Tool {
@@ -15,40 +15,34 @@ interface Tool {
   description: string
   cacheKey: (owner: string, repo: string) => string
   route: (owner: string, repo: string) => string
+  plusOnly?: boolean
 }
 
 const tools: Tool[] = [
   {
-    id: 'wiki-brief',
-    name: 'Quick Wiki',
-    icon: Zap,
-    description: 'Generate a brief wiki with overview and quickstart',
-    cacheKey: (o, r) => `wiki_brief_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/wiki/brief`
-  },
-  {
-    id: 'wiki-detailed',
-    name: 'Full Wiki',
-    icon: FileText,
-    description: 'Generate comprehensive multi-page documentation',
-    cacheKey: (o, r) => `wiki_detailed_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/wiki/detailed`
-  },
-  {
     id: 'product-docs',
-    name: 'Product Docs',
+    name: 'Product Documentation',
     icon: Users,
     description: 'End-user focused documentation with features and workflows',
     cacheKey: (o, r) => `product_docs_${o}_${r}`,
     route: (o, r) => `/repo/${o}/${r}/product-docs`
   },
   {
+    id: 'wiki-detailed',
+    name: 'Technical Documentation',
+    icon: FileText,
+    description: 'Generate comprehensive multi-page documentation',
+    cacheKey: (o, r) => `wiki_detailed_${o}_${r}`,
+    route: (o, r) => `/repo/${o}/${r}/wiki/detailed`
+  },
+  {
     id: 'docs',
-    name: 'Documentation (Legacy)',
+    name: 'Quick Documentation',
     icon: BookOpen,
     description: 'Single-page technical documentation',
     cacheKey: (o, r) => `docs_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/documentation`
+    route: (o, r) => `/repo/${o}/${r}/documentation`,
+    plusOnly: true
   },
   {
     id: 'package',
@@ -56,7 +50,8 @@ const tools: Tool[] = [
     icon: Package,
     description: 'Migrate this SaaS to Electron',
     cacheKey: (o, r) => `package_prompt_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/package-prompt`
+    route: (o, r) => `/repo/${o}/${r}/package-prompt`,
+    plusOnly: true
   },
   {
     id: 'reimplement',
@@ -64,7 +59,8 @@ const tools: Tool[] = [
     icon: RefreshCw,
     description: 'Rebuild with React/Vite/shadcn',
     cacheKey: (o, r) => `reimplement_prompt_${o}_${r}`,
-    route: (o, r) => `/repo/${o}/${r}/reimplement-prompt`
+    route: (o, r) => `/repo/${o}/${r}/reimplement-prompt`,
+    plusOnly: true
   },
 ]
 
@@ -158,37 +154,35 @@ export default function RepoPage() {
     <div className="min-h-screen bg-background relative">
       <AppHeader title={`${owner}/${repo}`} />
 
-      {/* Action Buttons */}
-      <div className="max-w-4xl mx-auto px-6 pt-4 flex justify-end gap-2">
-        {project?.url && (
-          <a href={project.url} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              View on GitHub
-            </Button>
-          </a>
-        )}
-        {project?.url && (
-          <Button
-            variant="outline"
-            onClick={() => setShowReindexDialog(true)}
-            disabled={showReindexDialog}
-          >
-            <RotateCw className="mr-2 h-4 w-4" />
-            Re-index
-          </Button>
-        )}
-      </div>
-
       <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* Repository Details Card */}
         {project && (
           <div>
             <h2 className="text-sm font-medium text-muted-foreground mb-3">Repository Details</h2>
             <Card className="p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-                <span className="font-medium">Indexed</span>
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="text-lg font-semibold">{owner}/{repo}</h3>
+                <div className="flex gap-2">
+                  {project.url && (
+                    <a href={project.url} target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline" size="sm">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        View on GitHub
+                      </Button>
+                    </a>
+                  )}
+                  {project.url && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowReindexDialog(true)}
+                      disabled={showReindexDialog}
+                    >
+                      <RotateCw className="mr-2 h-4 w-4" />
+                      Re-index
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="text-sm text-muted-foreground space-y-1">
                 <p>{project.fileCount} files · {project.chunkCount} chunks · {project.embedding?.provider || 'unknown'}</p>
@@ -202,7 +196,7 @@ export default function RepoPage() {
         <div>
           <h2 className="text-sm font-medium text-muted-foreground mb-3">Tools</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {tools.map(tool => {
+            {tools.filter(tool => !tool.plusOnly || isPlusUser()).map(tool => {
               const Icon = tool.icon
               const isGenerated = generatedTools.has(tool.id)
               return (

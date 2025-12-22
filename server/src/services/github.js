@@ -30,31 +30,44 @@ export function parseGitHubUrl(url) {
 /**
  * Fetch with GitHub API headers
  */
-async function githubFetch(url) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'ProductWiki/1.0',
-    },
-  });
+async function githubFetch(url, timeout = 300000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error(`Repository not found or is private: ${url}`);
-    }
-    if (response.status === 403) {
-      const remaining = response.headers.get('X-RateLimit-Remaining');
-      const reset = response.headers.get('X-RateLimit-Reset');
-      if (remaining === '0') {
-        const resetDate = new Date(parseInt(reset) * 1000);
-        throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate.toISOString()}`);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github.v3+json',
+        'User-Agent': 'ProductWiki/1.0',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`Repository not found or is private: ${url}`);
       }
-      throw new Error(`GitHub API forbidden: ${response.statusText}`);
+      if (response.status === 403) {
+        const remaining = response.headers.get('X-RateLimit-Remaining');
+        const reset = response.headers.get('X-RateLimit-Reset');
+        if (remaining === '0') {
+          const resetDate = new Date(parseInt(reset) * 1000);
+          throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate.toISOString()}`);
+        }
+        throw new Error(`GitHub API forbidden: ${response.statusText}`);
+      }
+      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
-    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-  }
 
-  return response;
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`GitHub API request timeout after ${timeout}ms: ${url}`);
+    }
+    throw error;
+  }
 }
 
 /**

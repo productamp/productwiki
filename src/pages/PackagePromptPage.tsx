@@ -3,11 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DocumentationViewer } from '@/components/DocumentationViewer'
-import { NotificationDropdown } from '@/components/NotificationDropdown'
-import { SettingsButton } from '@/components/Settings'
+import { AppHeader } from '@/components/AppHeader'
 import { getProject, generatePackagePrompt, JobIds, type ProjectMetadata } from '@/lib/api'
 import { useSimpleJobReconnection } from '@/hooks/useJobReconnection'
-import { Loader2, ArrowLeft, Package, Copy, Check, RotateCw } from 'lucide-react'
+import { Loader2, Copy, Check, RotateCw, ArrowLeft } from 'lucide-react'
 
 export default function PackagePromptPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -110,51 +109,35 @@ export default function PackagePromptPage() {
 
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="max-w-6xl mx-auto px-8 py-4">
-          <div className="flex items-center gap-4">
-            <Link to={`/repo/${owner}/${repo}`}>
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
+      <AppHeader
+        title={`${owner}/${repo}`}
+        titleHref={`/repo/${owner}/${repo}`}
+        subtitle="Package Prompt"
+        actions={
+          <>
+            {prompt && !generating && (
+              <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
+                <RotateCw className="h-4 w-4" />
               </Button>
-            </Link>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <Package className="h-6 w-6" />
-                Electron Package Prompt
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {owner}/{repo}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {prompt && !generating && (
-                <Button onClick={handleGenerate} variant="outline" size="icon" title="Regenerate">
-                  <RotateCw className="h-4 w-4" />
-                </Button>
-              )}
-              {prompt && (
-                <Button onClick={handleCopy} variant="outline">
-                  {copied ? (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy Prompt
-                    </>
-                  )}
-                </Button>
-              )}
-              <NotificationDropdown />
-              <SettingsButton />
-            </div>
-          </div>
-        </div>
-      </div>
+            )}
+            {prompt && (
+              <Button onClick={handleCopy} variant="outline" size="sm">
+                {copied ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Content */}
       <div className="max-w-6xl mx-auto px-8 py-6 space-y-6">
