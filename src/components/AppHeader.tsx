@@ -6,11 +6,12 @@ import { ReactNode } from 'react'
 
 interface AppHeaderProps {
   title?: string
+  titleHref?: string
   subtitle?: string
   actions?: ReactNode
 }
 
-export function AppHeader({ title, subtitle, actions }: AppHeaderProps) {
+export function AppHeader({ title, titleHref, subtitle, actions }: AppHeaderProps) {
   return (
     <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
       <div className="flex items-center gap-2">
@@ -21,7 +22,13 @@ export function AppHeader({ title, subtitle, actions }: AppHeaderProps) {
         {title && (
           <>
             <span className="text-muted-foreground">/</span>
-            <span className="font-medium text-sm">{title}</span>
+            {titleHref ? (
+              <Link to={titleHref} className="font-medium text-sm hover:opacity-80 transition-opacity">
+                {title}
+              </Link>
+            ) : (
+              <span className="font-medium text-sm">{title}</span>
+            )}
           </>
         )}
         {subtitle && (

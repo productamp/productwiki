@@ -289,6 +289,7 @@ export default function WikiPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <AppHeader
         title={`${owner}/${repo}`}
+        titleHref={`/repo/${owner}/${repo}`}
         subtitle="Technical Documentation"
         actions={
           <>

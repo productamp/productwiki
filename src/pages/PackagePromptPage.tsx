@@ -111,6 +111,7 @@ export default function PackagePromptPage() {
     <div className="min-h-screen bg-background relative">
       <AppHeader
         title={`${owner}/${repo}`}
+        titleHref={`/repo/${owner}/${repo}`}
         subtitle="Package Prompt"
         actions={
           <>

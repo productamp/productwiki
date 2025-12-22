@@ -111,6 +111,7 @@ export default function ReimplementPromptPage() {
     <div className="min-h-screen bg-background relative">
       <AppHeader
         title={`${owner}/${repo}`}
+        titleHref={`/repo/${owner}/${repo}`}
         subtitle="Reimplement"
         actions={
           <>

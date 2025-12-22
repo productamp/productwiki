@@ -117,6 +117,7 @@ export default function DocumentationPage() {
     <div className="min-h-screen bg-background relative">
       <AppHeader
         title={`${owner}/${repo}`}
+        titleHref={`/repo/${owner}/${repo}`}
         subtitle="Quick Documentation"
         actions={
           <>
