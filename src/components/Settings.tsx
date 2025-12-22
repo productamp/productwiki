@@ -84,7 +84,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onClose={() => onOpenChange(false)} className="w-[48rem] h-[600px] p-0 overflow-hidden">
+      <DialogContent onClose={() => onOpenChange(false)} className="w-[56rem] h-[600px] p-0 overflow-hidden">
         <div className="flex h-full">
           {/* Sidebar */}
           <div className="w-48 border-r bg-muted/30 p-4 space-y-1">
