@@ -30,7 +30,7 @@ export function parseGitHubUrl(url) {
 /**
  * Fetch with GitHub API headers
  */
-async function githubFetch(url, timeout = 60000) {
+async function githubFetch(url, timeout = 300000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
