@@ -29,7 +29,7 @@ const tools: Tool[] = [
   },
   {
     id: 'wiki-detailed',
-    name: 'Full Wiki',
+    name: 'Technical Documentation',
     icon: FileText,
     description: 'Generate comprehensive multi-page documentation',
     cacheKey: (o, r) => `wiki_detailed_${o}_${r}`,
