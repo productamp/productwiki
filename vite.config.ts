@@ -11,11 +11,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:8001',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
+      '/index': 'http://localhost:3847',
+      '/projects': 'http://localhost:3847',
+      '/generate': 'http://localhost:3847',
+      '/wiki': 'http://localhost:3847',
+      '/logs': 'http://localhost:3847',
+      '/jobs': 'http://localhost:3847',
     },
   },
 })
