@@ -1,8 +1,9 @@
 /**
  * RAG-based generation services for documentation, package prompts, and reimplementation
  */
-import { streamChat } from '../providers/index.js';
-import { queryRag, buildRagContext, isIndexed } from './ragQuery.js';
+import { streamChat } from './llm.js';
+import { queryRag, buildRagContext, isIndexed, QueryOptions } from './ragQuery.js';
+import { KeyEntry } from './api-key-pool.js';
 
 /**
  * System prompt for documentation generation
@@ -164,18 +165,25 @@ GUIDELINES FOR THE PROMPT:
 - Include all features but exclude auth/user management
 - Keep the prompt focused on functionality, not implementation details`;
 
+export interface GeneratorOptions extends QueryOptions {
+  model?: string;
+}
+
 /**
  * Generate reimplement prompt for a repository using RAG
  */
-export async function* generateReimplementPrompt(owner, repo, options = {}) {
-  // Check if repository is indexed
+export async function* generateReimplementPrompt(
+  owner: string,
+  repo: string,
+  options: GeneratorOptions = {}
+): AsyncGenerator<string> {
   if (!(await isIndexed(owner, repo))) {
     yield 'No indexed content found for this repository. Please index the repository first.';
     return;
   }
 
-  // Use semantic search to find relevant chunks for reimplementation
-  const searchQuery = 'features functionality components user interface state management data flow API routes pages application structure';
+  const searchQuery =
+    'features functionality components user interface state management data flow API routes pages application structure';
   const chunks = await queryRag(owner, repo, searchQuery, options, 30);
 
   if (chunks.length === 0) {
@@ -183,13 +191,11 @@ export async function* generateReimplementPrompt(owner, repo, options = {}) {
     return;
   }
 
-  // Build context from RAG results
   const context = buildRagContext(chunks);
 
-  // Create messages
   const messages = [
     {
-      role: 'user',
+      role: 'user' as const,
       content: `Here is the relevant codebase content of an application (retrieved via semantic search for features, components, and application structure):\n\n${context}\n\nPlease analyze this codebase and generate a comprehensive one-shot prompt for Claude Code to reimplement this application using React, Vite, TypeScript, and shadcn/ui.
 
 Remember:
@@ -202,8 +208,7 @@ Follow the structure outlined in your instructions.`,
     },
   ];
 
-  // Stream response
-  for await (const chunk of streamChat(REIMPLEMENT_PROMPT_SYSTEM, messages, options)) {
+  for await (const chunk of streamChat(REIMPLEMENT_PROMPT_SYSTEM, messages, options.apiKeys, options.model)) {
     yield chunk;
   }
 }
@@ -211,15 +216,18 @@ Follow the structure outlined in your instructions.`,
 /**
  * Generate documentation for a repository using RAG
  */
-export async function* generateDocumentation(owner, repo, options = {}) {
-  // Check if repository is indexed
+export async function* generateDocumentation(
+  owner: string,
+  repo: string,
+  options: GeneratorOptions = {}
+): AsyncGenerator<string> {
   if (!(await isIndexed(owner, repo))) {
     yield 'No indexed content found for this repository. Please index the repository first.';
     return;
   }
 
-  // Use semantic search to find relevant chunks for documentation
-  const searchQuery = 'project overview architecture components API configuration setup documentation readme main entry point';
+  const searchQuery =
+    'project overview architecture components API configuration setup documentation readme main entry point';
   const chunks = await queryRag(owner, repo, searchQuery, options, 30);
 
   if (chunks.length === 0) {
@@ -227,19 +235,16 @@ export async function* generateDocumentation(owner, repo, options = {}) {
     return;
   }
 
-  // Build context from RAG results
   const context = buildRagContext(chunks);
 
-  // Create messages
   const messages = [
     {
-      role: 'user',
+      role: 'user' as const,
       content: `Here is the relevant codebase content (retrieved via semantic search for documentation topics):\n\n${context}\n\nPlease generate comprehensive technical documentation for this codebase following the structure outlined in your instructions.`,
     },
   ];
 
-  // Stream response
-  for await (const chunk of streamChat(SYSTEM_PROMPT, messages, options)) {
+  for await (const chunk of streamChat(SYSTEM_PROMPT, messages, options.apiKeys, options.model)) {
     yield chunk;
   }
 }
@@ -247,15 +252,18 @@ export async function* generateDocumentation(owner, repo, options = {}) {
 /**
  * Generate package/migration prompt for a repository using RAG
  */
-export async function* generatePackagePrompt(owner, repo, options = {}) {
-  // Check if repository is indexed
+export async function* generatePackagePrompt(
+  owner: string,
+  repo: string,
+  options: GeneratorOptions = {}
+): AsyncGenerator<string> {
   if (!(await isIndexed(owner, repo))) {
     yield 'No indexed content found for this repository. Please index the repository first.';
     return;
   }
 
-  // Use semantic search to find relevant chunks for Electron migration
-  const searchQuery = 'electron desktop application architecture configuration build client server API routes database storage environment';
+  const searchQuery =
+    'electron desktop application architecture configuration build client server API routes database storage environment';
   const chunks = await queryRag(owner, repo, searchQuery, options, 30);
 
   if (chunks.length === 0) {
@@ -263,19 +271,16 @@ export async function* generatePackagePrompt(owner, repo, options = {}) {
     return;
   }
 
-  // Build context from RAG results
   const context = buildRagContext(chunks);
 
-  // Create messages
   const messages = [
     {
-      role: 'user',
+      role: 'user' as const,
       content: `Here is the relevant codebase content of a SaaS web application (retrieved via semantic search for architecture and configuration):\n\n${context}\n\nPlease analyze this codebase and generate a comprehensive one-shot prompt that I can give to Claude Code to migrate this application to an Electron desktop app. Follow the structure outlined in your instructions.`,
     },
   ];
 
-  // Stream response
-  for await (const chunk of streamChat(PACKAGE_PROMPT_SYSTEM, messages, options)) {
+  for await (const chunk of streamChat(PACKAGE_PROMPT_SYSTEM, messages, options.apiKeys, options.model)) {
     yield chunk;
   }
 }

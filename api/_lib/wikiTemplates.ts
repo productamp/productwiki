@@ -1,13 +1,32 @@
 /**
  * Wiki structure templates and prompts for documentation generation
- * Based on DeepWiki reference implementation
  */
+
+export interface WikiPage {
+  id: string;
+  title: string;
+  description: string;
+  importance: 'high' | 'medium' | 'low';
+  filePaths: string[];
+  relatedPages: string[];
+}
+
+export interface WikiStructure {
+  title: string;
+  description: string;
+  pages: WikiPage[];
+}
 
 /**
  * System prompt for Phase 1: Structure generation
- * LLM analyzes file tree + README to determine wiki structure
  */
-export function getStructureGenerationPrompt(owner, repo, fileTree, readme, isComprehensive = true) {
+export function getStructureGenerationPrompt(
+  owner: string,
+  repo: string,
+  fileTree: string,
+  readme: string,
+  isComprehensive: boolean = true
+): string {
   const pageCount = isComprehensive ? '8-12' : '4-6';
   const viewType = isComprehensive ? 'comprehensive' : 'concise';
 
@@ -76,9 +95,8 @@ IMPORTANT:
 
 /**
  * System prompt for Phase 2: Page content generation
- * Generates comprehensive wiki page content with diagrams, tables, and source citations
  */
-export function getPageGenerationPrompt(pageTitle, filePaths, repoUrl) {
+export function getPageGenerationPrompt(pageTitle: string, filePaths: string[], repoUrl: string): string {
   return `You are an expert technical writer and software architect.
 Your task is to generate a comprehensive and accurate technical wiki page in Markdown format about a specific feature, system, or module within a given software project.
 
@@ -135,10 +153,9 @@ Remember:
 }
 
 /**
- * Brief wiki template - Quick overview generation
- * Uses simpler structure for faster generation
+ * Brief wiki template
  */
-export const briefWikiTemplate = {
+export const briefWikiTemplate: WikiStructure = {
   title: '',
   description: '',
   pages: [
@@ -147,7 +164,7 @@ export const briefWikiTemplate = {
       title: 'Project Overview',
       description: 'High-level overview of the project, its purpose, and key features',
       importance: 'high',
-      filePaths: [], // Will be populated from README, package.json, main entry files
+      filePaths: [],
       relatedPages: ['getting-started'],
     },
     {
@@ -155,17 +172,16 @@ export const briefWikiTemplate = {
       title: 'Getting Started',
       description: 'Quick setup guide and basic usage instructions',
       importance: 'high',
-      filePaths: [], // Will be populated from README, config files
+      filePaths: [],
       relatedPages: ['overview'],
     },
   ],
 };
 
 /**
- * Detailed wiki template - Comprehensive documentation
- * Used as fallback when LLM structure generation fails
+ * Detailed wiki template
  */
-export const detailedWikiTemplate = {
+export const detailedWikiTemplate: WikiStructure = {
   title: '',
   description: '',
   pages: [
@@ -221,10 +237,9 @@ export const detailedWikiTemplate = {
 };
 
 /**
- * Product Documentation template - Traditional product documentation style
- * Matches the format of professional help centers and product guides
+ * Product documentation template
  */
-export const productDocsTemplate = {
+export const productDocsTemplate: WikiStructure = {
   title: '',
   description: '',
   pages: [
@@ -281,9 +296,8 @@ export const productDocsTemplate = {
 
 /**
  * System prompt for Product Documentation structure generation
- * Creates traditional product documentation like Notion, Stripe, or Slack help centers
  */
-export function getProductDocsStructurePrompt(owner, repo, fileTree, readme) {
+export function getProductDocsStructurePrompt(owner: string, repo: string, fileTree: string, readme: string): string {
   return `You are creating the documentation structure for a product help center, similar to what companies like Notion, Stripe, Slack, or Figma publish for their users.
 
 Analyze this software product ${owner}/${repo}:
@@ -345,9 +359,8 @@ REQUIREMENTS:
 
 /**
  * System prompt for Product Documentation page content generation
- * Creates traditional product documentation in the style of professional help centers
  */
-export function getProductDocsPagePrompt(pageTitle, filePaths, productName) {
+export function getProductDocsPagePrompt(pageTitle: string, filePaths: string[], productName: string): string {
   return `You are writing product documentation for "${productName}", specifically the "${pageTitle}" page.
 
 Write in the style of professional product documentation like Notion Help, Stripe Docs, or Slack Help Center. This is reference documentation, not a tutorial.

@@ -2,13 +2,28 @@
  * GitHub API service for fetching repository contents
  * Uses the public GitHub API (no authentication required for public repos)
  */
+import { config } from './config.js';
 
 const GITHUB_API_BASE = 'https://api.github.com';
+
+export interface GitHubFile {
+  path: string;
+  content: string;
+  extension: string;
+}
+
+export interface RepositoryData {
+  owner: string;
+  repo: string;
+  url: string;
+  files: GitHubFile[];
+  branch: string;
+}
 
 /**
  * Parse GitHub URL to extract owner and repo
  */
-export function parseGitHubUrl(url) {
+export function parseGitHubUrl(url: string): { owner: string; repo: string } {
   const patterns = [
     /github\.com\/([^\/]+)\/([^\/\.]+)/,
     /github\.com:([^\/]+)\/([^\/\.]+)/,
@@ -30,7 +45,7 @@ export function parseGitHubUrl(url) {
 /**
  * Fetch with GitHub API headers
  */
-async function githubFetch(url) {
+async function githubFetch(url: string): Promise<Response> {
   const response = await fetch(url, {
     headers: {
       Accept: 'application/vnd.github.v3+json',
@@ -46,7 +61,7 @@ async function githubFetch(url) {
       const remaining = response.headers.get('X-RateLimit-Remaining');
       const reset = response.headers.get('X-RateLimit-Reset');
       if (remaining === '0') {
-        const resetDate = new Date(parseInt(reset) * 1000);
+        const resetDate = new Date(parseInt(reset || '0') * 1000);
         throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate.toISOString()}`);
       }
       throw new Error(`GitHub API forbidden: ${response.statusText}`);
@@ -60,17 +75,23 @@ async function githubFetch(url) {
 /**
  * Get the default branch for a repository
  */
-async function getDefaultBranch(owner, repo) {
+async function getDefaultBranch(owner: string, repo: string): Promise<string> {
   const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}`;
   const response = await githubFetch(url);
   const data = await response.json();
   return data.default_branch;
 }
 
+interface TreeItem {
+  type: string;
+  path: string;
+  size?: number;
+}
+
 /**
  * Recursively fetch repository tree
  */
-async function getRepositoryTree(owner, repo, branch) {
+async function getRepositoryTree(owner: string, repo: string, branch: string): Promise<TreeItem[]> {
   const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
   const response = await githubFetch(url);
   const data = await response.json();
@@ -85,7 +106,7 @@ async function getRepositoryTree(owner, repo, branch) {
 /**
  * Fetch raw file content from GitHub
  */
-async function fetchFileContent(owner, repo, path, branch) {
+async function fetchFileContent(owner: string, repo: string, path: string, branch: string): Promise<string> {
   const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
   const response = await fetch(url, {
     headers: {
@@ -103,11 +124,11 @@ async function fetchFileContent(owner, repo, path, branch) {
 /**
  * Check if file extension is supported
  */
-function isSupportedExtension(path, supportedExtensions) {
-  const ext = path.includes('.') ? '.' + path.split('.').pop().toLowerCase() : '';
+function isSupportedExtension(path: string, supportedExtensions: string[]): boolean {
+  const ext = path.includes('.') ? '.' + path.split('.').pop()?.toLowerCase() : '';
 
   // Special cases for files without typical extensions
-  const baseName = path.split('/').pop().toLowerCase();
+  const baseName = path.split('/').pop()?.toLowerCase() || '';
   if (baseName.includes('dockerfile') || baseName.includes('makefile')) {
     return true;
   }
@@ -118,7 +139,12 @@ function isSupportedExtension(path, supportedExtensions) {
 /**
  * Check if path should be excluded
  */
-function shouldExcludePath(path, excludedDirs, excludedFiles, excludedPatterns) {
+function shouldExcludePath(
+  path: string,
+  excludedDirs: string[],
+  excludedFiles: string[],
+  excludedPatterns: RegExp[]
+): boolean {
   const parts = path.split('/');
   const fileName = parts[parts.length - 1];
 
@@ -147,7 +173,10 @@ function shouldExcludePath(path, excludedDirs, excludedFiles, excludedPatterns) 
 /**
  * Fetch all files from a public GitHub repository using the API
  */
-export async function fetchRepositoryFiles(owner, repo, config) {
+export async function fetchRepositoryFiles(
+  owner: string,
+  repo: string
+): Promise<{ files: GitHubFile[]; branch: string }> {
   console.log(`[GitHub] Fetching repository ${owner}/${repo}...`);
 
   // Get the default branch
@@ -159,11 +188,13 @@ export async function fetchRepositoryFiles(owner, repo, config) {
   console.log(`[GitHub] Found ${tree.length} items in tree`);
 
   // Filter to supported files
-  const files = tree.filter(item => {
+  const files = tree.filter((item) => {
     if (item.type !== 'blob') return false;
-    if (item.size > config.maxFileSize) return false;
+    if (item.size && item.size > config.maxFileSize) return false;
     if (!isSupportedExtension(item.path, config.supportedExtensions)) return false;
-    if (shouldExcludePath(item.path, config.excludedDirs, config.excludedFiles, config.excludedPatterns)) return false;
+    if (shouldExcludePath(item.path, config.excludedDirs, config.excludedFiles, config.excludedPatterns)) {
+      return false;
+    }
     return true;
   });
 
@@ -171,7 +202,7 @@ export async function fetchRepositoryFiles(owner, repo, config) {
 
   // Fetch content for each file (with concurrency limit)
   const CONCURRENCY = 10;
-  const results = [];
+  const results: GitHubFile[] = [];
   let completed = 0;
 
   for (let i = 0; i < files.length; i += CONCURRENCY) {
@@ -189,16 +220,16 @@ export async function fetchRepositoryFiles(owner, repo, config) {
           return {
             path: file.path,
             content,
-            extension: file.path.includes('.') ? '.' + file.path.split('.').pop().toLowerCase() : '',
+            extension: file.path.includes('.') ? '.' + file.path.split('.').pop()?.toLowerCase() : '',
           };
         } catch (error) {
-          console.warn(`[GitHub] Failed to fetch ${file.path}: ${error.message}`);
+          console.warn(`[GitHub] Failed to fetch ${file.path}: ${(error as Error).message}`);
           return null;
         }
       })
     );
 
-    results.push(...batchResults.filter(Boolean));
+    results.push(...(batchResults.filter(Boolean) as GitHubFile[]));
     completed += batch.length;
 
     if (completed % 50 === 0 || completed === files.length) {
@@ -213,7 +244,7 @@ export async function fetchRepositoryFiles(owner, repo, config) {
 /**
  * Fetch README content from repository
  */
-export async function fetchReadmeContent(owner, repo, branch) {
+export async function fetchReadmeContent(owner: string, repo: string, branch: string): Promise<string> {
   const readmeNames = ['README.md', 'readme.md', 'README.MD', 'README', 'readme.txt', 'README.txt'];
 
   for (const name of readmeNames) {
@@ -231,10 +262,9 @@ export async function fetchReadmeContent(owner, repo, branch) {
 /**
  * Process a repository: fetch all files via GitHub API
  */
-export async function processRepository(url, config) {
+export async function processRepository(url: string): Promise<RepositoryData> {
   const { owner, repo } = parseGitHubUrl(url);
-
-  const { files, branch } = await fetchRepositoryFiles(owner, repo, config);
+  const { files, branch } = await fetchRepositoryFiles(owner, repo);
 
   return {
     owner,

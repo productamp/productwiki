@@ -1,5 +1,7 @@
-import { homedir } from 'os';
-import { join } from 'path';
+/**
+ * Serverless configuration for Vercel deployment
+ * Updated for Gemma-3-27b-it and Upstash Vector
+ */
 
 export const config = {
   // Chunking settings
@@ -83,33 +85,16 @@ export const config = {
   // Max file size (1MB)
   maxFileSize: 1024 * 1024,
 
-  // Data directory
-  dataDir: join(homedir(), '.productwiki'),
-  vectorsDir: join(homedir(), '.productwiki', 'vectors'),
-  metaDir: join(homedir(), '.productwiki', 'meta'),
-
-  // Embedding settings
+  // Embedding settings - Google text-embedding-004
   embeddingBatchSize: 100,
-  embeddingConcurrency: 5, // Max parallel embedding requests to avoid connection issues
+  embeddingConcurrency: 5,
   embeddingModel: 'text-embedding-004',
   embeddingDimensions: 768,
 
-  // LLM settings
-  llmModel: 'gemini-3-flash-preview',
+  // LLM settings - Gemma 3 27B via Google AI Studio
+  llmModel: 'gemma-3-27b-it',
   maxContextChunks: 100,
 
   // RAG settings for wiki generation
-  topK: 20, // Number of chunks to retrieve per section query
-
-  // Provider selection: 'gemini' or 'ollama'
-  llmProvider: process.env.LLM_PROVIDER || 'gemini',
-
-  // Ollama settings (OLLAMA_HOST is the standard env var used by Ollama CLI)
-  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:11434',
-  ollamaLlmModel: process.env.OLLAMA_LLM_MODEL || 'qwen2.5-coder:3b',
-  ollamaEmbeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
-  ollamaEmbeddingDimensions: 768, // nomic-embed-text default, auto-detected at runtime
-
-  // Server
-  port: 3847,
+  topK: 20,
 };

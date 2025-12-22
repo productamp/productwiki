@@ -1,23 +1,26 @@
+/**
+ * LLM provider for Gemma-3-27b-it via Google AI Studio
+ */
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { config } from '../config/index.js';
-import { logError } from '../services/errorLog.js';
-import { getKeyPool, isRateLimitError, sleep } from './api-key-pool.js';
+import { config } from './config.js';
+import { getKeyPool, isRateLimitError, sleep, KeyEntry } from './api-key-pool.js';
 
 /**
  * Check if a model is a Gemma model (doesn't support systemInstruction)
  */
-function isGemmaModel(model) {
+function isGemmaModel(model: string): boolean {
   return model && model.toLowerCase().includes('gemma');
 }
 
 /**
  * Get LLM model for a specific API key and system prompt
  */
-function getClient(apiKey, systemPrompt, model) {
+function getClient(apiKey: string, systemPrompt: string, model: string) {
   const key = apiKey || process.env.GOOGLE_API_KEY;
   if (!key) {
     throw new Error('Google API key is required. Set it in Settings or GOOGLE_API_KEY environment variable.');
   }
+
   const genAI = new GoogleGenerativeAI(key);
   const modelName = model || config.llmModel;
 
@@ -28,25 +31,35 @@ function getClient(apiKey, systemPrompt, model) {
 
   return genAI.getGenerativeModel({
     model: modelName,
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-    },
+    systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
   });
 }
 
 /**
  * Check if error is a stream parsing error that should be retried
  */
-function isStreamParseError(err) {
-  const message = err?.message?.toLowerCase() || '';
-  return message.includes('failed to parse stream') ||
-    message.includes('stream') && message.includes('error');
+function isStreamParseError(err: unknown): boolean {
+  const message = (err as { message?: string })?.message?.toLowerCase() || '';
+  return (
+    message.includes('failed to parse stream') ||
+    (message.includes('stream') && message.includes('error'))
+  );
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 /**
- * Stream chat with a single key (internal implementation)
+ * Stream chat with a single key
  */
-async function* streamChatWithKey(systemPrompt, messages, apiKey, model) {
+async function* streamChatWithKey(
+  systemPrompt: string,
+  messages: Message[],
+  apiKey: string,
+  model: string
+): AsyncGenerator<string> {
   const modelName = model || config.llmModel;
   const llm = getClient(apiKey, systemPrompt, modelName);
 
@@ -73,7 +86,8 @@ async function* streamChatWithKey(systemPrompt, messages, apiKey, model) {
   const lastMessage = processedMessages[processedMessages.length - 1];
 
   // Log prompt size for debugging
-  const totalChars = (systemPrompt?.length || 0) +
+  const totalChars =
+    (systemPrompt?.length || 0) +
     processedMessages.reduce((sum, m) => sum + (m.content?.length || 0), 0);
   const estimatedTokens = Math.ceil(totalChars / 4);
   console.log(`[LLM] Request to ${modelName}: ~${totalChars} chars (~${estimatedTokens} tokens)`);
@@ -93,15 +107,25 @@ async function* streamChatWithKey(systemPrompt, messages, apiKey, model) {
 }
 
 /**
- * Stream chat completion with automatic key rotation on rate limit errors
- * @param {string} systemPrompt - System prompt
- * @param {Array} messages - Chat messages
- * @param {string|string[]} apiKeys - Single key or array of keys
- * @param {string} model - Model name
+ * Log error (simplified for serverless)
  */
-export async function* streamChat(systemPrompt, messages, apiKeys, model) {
+function logError(message: string): void {
+  console.error(`[LLM Error] ${message}`);
+}
+
+/**
+ * Stream chat completion with automatic key rotation on rate limit errors
+ */
+export async function* streamChat(
+  systemPrompt: string,
+  messages: Message[],
+  apiKeys?: (string | KeyEntry)[],
+  model?: string
+): AsyncGenerator<string> {
   // Normalize to array
-  const keys = Array.isArray(apiKeys) ? apiKeys : [apiKeys].filter(Boolean);
+  const keys: (string | KeyEntry)[] = Array.isArray(apiKeys)
+    ? apiKeys
+    : [apiKeys].filter(Boolean) as (string | KeyEntry)[];
 
   // Add env fallback if no keys provided
   if (keys.length === 0 && process.env.GOOGLE_API_KEY) {
@@ -122,7 +146,6 @@ export async function* streamChat(systemPrompt, messages, apiKeys, model) {
     const available = pool.getAvailableKey();
 
     if (!available) {
-      // All keys in cooldown - throw error instead of waiting
       const waitTime = pool.getTimeUntilAvailable();
       const keysInCooldown = pool.getKeysInCooldown();
       const waitSeconds = Math.ceil(waitTime / 1000);
@@ -135,7 +158,7 @@ export async function* streamChat(systemPrompt, messages, apiKeys, model) {
     console.log(`[LLM] Using "${label}" (index ${index})`);
 
     try {
-      yield* streamChatWithKey(systemPrompt, messages, key, model);
+      yield* streamChatWithKey(systemPrompt, messages, key, model || config.llmModel);
       return;
     } catch (err) {
       if (isRateLimitError(err)) {
@@ -143,14 +166,14 @@ export async function* streamChat(systemPrompt, messages, apiKeys, model) {
         logError(`Rate limit hit on "${label}" (${index + 1}/${pool.getKeyCount()}), cooldown started`);
         continue;
       }
-      // Retry stream parsing errors (often transient network issues)
+      // Retry stream parsing errors
       if (isStreamParseError(err) && streamRetries < MAX_STREAM_RETRIES) {
         streamRetries++;
         console.log(`[LLM] Stream parse error on "${label}", retrying (${streamRetries}/${MAX_STREAM_RETRIES})...`);
-        await sleep(1000 * streamRetries); // Exponential backoff
+        await sleep(1000 * streamRetries);
         continue;
       }
-      logError(`LLM error on "${label}": ${err.message}`);
+      logError(`LLM error on "${label}": ${(err as Error).message}`);
       throw err;
     }
   }

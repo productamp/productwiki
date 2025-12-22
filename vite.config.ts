@@ -11,10 +11,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Proxy /api requests to Vercel dev server (vercel dev runs on 3000)
       '/api': {
-        target: 'http://localhost:8001',
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

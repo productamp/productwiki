@@ -1,23 +1,35 @@
-import { join } from 'path';
-import { writeFile } from 'fs/promises';
-import { config } from '../config/index.js';
-import { processRepository } from './repository.js';
-import { storeEmbeddings } from './vectorStore.js';
-import { embedBatch, embedBatchWithProgress } from '../providers/index.js';
+/**
+ * Repository indexer service
+ * Handles fetching, chunking, embedding, and storing repository content
+ */
+import { config } from './config.js';
+import { processRepository, GitHubFile } from './github.js';
+import { storeEmbeddings, saveProjectMetadata, Chunk } from './vectorStore.js';
+import { embedBatchWithProgress } from './embeddings.js';
+import { KeyEntry } from './api-key-pool.js';
+
+interface ChunkData {
+  id: string;
+  path: string;
+  content: string;
+  chunkIndex: number;
+  totalChunks: number;
+  extension: string;
+}
 
 /**
  * Split text into words
  */
-function splitIntoWords(text) {
+function splitIntoWords(text: string): string[] {
   return text.split(/\s+/).filter(Boolean);
 }
 
 /**
  * Chunk a document into overlapping pieces
  */
-function chunkDocument(doc) {
+function chunkDocument(doc: GitHubFile): ChunkData[] {
   const words = splitIntoWords(doc.content);
-  const chunks = [];
+  const chunks: ChunkData[] = [];
 
   if (words.length <= config.chunkSize) {
     // Document is smaller than chunk size, keep as single chunk
@@ -66,21 +78,47 @@ function chunkDocument(doc) {
   return chunks;
 }
 
+export interface IndexProgress {
+  phase: 'clone' | 'extract' | 'chunk' | 'embed' | 'store' | 'complete' | 'done' | 'cancelled' | 'error';
+  status?: string;
+  fileCount?: number;
+  chunkCount?: number;
+  current?: number;
+  total?: number;
+  metadata?: {
+    owner: string;
+    repo: string;
+    url: string;
+    branch: string;
+    indexedAt: string;
+    fileCount: number;
+    chunkCount: number;
+  };
+  error?: string;
+}
+
+export interface IndexOptions {
+  apiKeys?: (string | KeyEntry)[];
+  signal?: { aborted: boolean };
+}
+
 /**
  * Index a repository (async generator that yields progress events)
  */
-export async function* indexRepositoryWithProgress(url, options = {}) {
-  const { signal } = options;
+export async function* indexRepositoryWithProgress(
+  url: string,
+  options: IndexOptions = {}
+): AsyncGenerator<IndexProgress> {
+  const { signal, apiKeys } = options;
   console.log(`Indexing repository: ${url}`);
 
-  // Check for cancellation
   if (signal?.aborted) {
     throw new Error('Indexing cancelled');
   }
 
   // Fetch files from GitHub API
   yield { phase: 'clone', status: 'started' };
-  const { owner, repo, files, branch } = await processRepository(url, config);
+  const { owner, repo, files, branch } = await processRepository(url);
   yield { phase: 'clone', status: 'completed' };
 
   if (signal?.aborted) {
@@ -91,7 +129,7 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
   yield { phase: 'extract', status: 'completed', fileCount: files.length };
 
   // Chunk all documents
-  const allChunks = [];
+  const allChunks: ChunkData[] = [];
   for (const file of files) {
     const chunks = chunkDocument(file);
     allChunks.push(...chunks);
@@ -106,13 +144,13 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
 
   // Embed all chunks with progress
   const texts = allChunks.map((chunk) => chunk.content);
-  const embeddingGenerator = embedBatchWithProgress(texts, options);
-  let embeddings;
+  const embeddingGenerator = embedBatchWithProgress(texts, apiKeys, signal);
+  let embeddings: number[][] = [];
 
   while (true) {
     const { done, value } = await embeddingGenerator.next();
     if (done) {
-      embeddings = value;
+      embeddings = value as number[][];
       break;
     }
     // Yield embedding progress
@@ -121,9 +159,10 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
   yield { phase: 'embed', status: 'completed' };
 
   // Attach embeddings to chunks
-  for (let i = 0; i < allChunks.length; i++) {
-    allChunks[i].vector = embeddings[i];
-  }
+  const chunksWithVectors: Chunk[] = allChunks.map((chunk, i) => ({
+    ...chunk,
+    vector: embeddings[i],
+  }));
 
   if (signal?.aborted) {
     throw new Error('Indexing cancelled');
@@ -131,23 +170,10 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
 
   // Store in vector database
   yield { phase: 'store', status: 'started' };
-  await storeEmbeddings(owner, repo, allChunks);
+  await storeEmbeddings(owner, repo, chunksWithVectors);
   yield { phase: 'store', status: 'completed' };
 
-  // Determine embedding info for metadata
-  const provider = options.provider || config.llmProvider;
-  let embeddingModel;
-  let embeddingDimensions;
-
-  if (provider === 'ollama') {
-    embeddingModel = config.ollamaEmbeddingModel;
-    embeddingDimensions = config.ollamaEmbeddingDimensions;
-  } else {
-    embeddingModel = config.embeddingModel;
-    embeddingDimensions = config.embeddingDimensions;
-  }
-
-  // Save metadata with embedding info
+  // Save metadata
   const metadata = {
     owner,
     repo,
@@ -157,14 +183,13 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
     fileCount: files.length,
     chunkCount: allChunks.length,
     embedding: {
-      provider,
-      model: embeddingModel,
-      dimensions: embeddingDimensions,
+      provider: 'gemini',
+      model: config.embeddingModel,
+      dimensions: config.embeddingDimensions,
     },
   };
 
-  const metaPath = join(config.metaDir, `${owner}_${repo}.json`);
-  await writeFile(metaPath, JSON.stringify(metadata, null, 2));
+  await saveProjectMetadata(owner, repo, metadata);
 
   console.log(`Indexing complete for ${owner}/${repo}`);
 
@@ -173,12 +198,12 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
 }
 
 /**
- * Index a repository (non-streaming, for backward compatibility)
+ * Index a repository (non-streaming)
  */
-export async function indexRepository(url, options = {}) {
+export async function indexRepository(url: string, options: IndexOptions = {}) {
   const generator = indexRepositoryWithProgress(url, options);
   let result;
-  // Consume the generator until done
+
   while (true) {
     const { done, value } = await generator.next();
     if (done) {
@@ -186,5 +211,6 @@ export async function indexRepository(url, options = {}) {
       break;
     }
   }
+
   return result;
 }

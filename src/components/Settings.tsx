@@ -77,6 +77,9 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
           </DialogTitle>
           <DialogDescription>
             Configure your LLM provider for embeddings and generation.
+            <span className="block mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+              API keys are optional - default keys are provided for demo usage.
+            </span>
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 mt-4">
@@ -148,7 +151,8 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                   Add API Key
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Add multiple keys to rotate when rate limited. Get keys from{' '}
+                  Optional: Add your own keys to avoid rate limits. Default keys are provided for demo.
+                  Get keys from{' '}
                   <a
                     href="https://aistudio.google.com/apikey"
                     target="_blank"

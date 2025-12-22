@@ -1,10 +1,14 @@
-const BASE_URL = 'http://localhost:3847'
+// Use relative URL for same-origin in production, or VITE env var for dev
+const BASE_URL = import.meta.env.VITE_API_URL || '/api'
+
+// Legacy localStorage keys (kept for migration to IndexedDB)
 const API_KEY_STORAGE_KEY = 'productwiki_api_key'
 const API_KEYS_STORAGE_KEY = 'productwiki_api_keys'
 const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider'
 const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model'
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview'
+// Default model is now Gemma-3-27b-it via Google AI Studio
+export const DEFAULT_GEMINI_MODEL = 'gemma-3-27b-it'
 
 export type LlmProvider = 'gemini' | 'ollama'
 
