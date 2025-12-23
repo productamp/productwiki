@@ -14,6 +14,7 @@ import {
   type WikiEvent,
 } from '@/lib/api'
 import { useWikiJobReconnection } from '@/hooks/useJobReconnection'
+import { useNotifications } from '@/contexts/NotificationContext'
 import {
   Loader2,
   Copy,
@@ -36,14 +37,16 @@ interface WikiState {
   [pageId: string]: PageState
 }
 
+const TOAST_ID = 'product-docs-status'
+
 export default function ProductDocsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
   const [project, setProject] = useState<ProjectMetadata | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [generating, setGenerating] = useState(false)
-  const [status, setStatus] = useState('')
   const [copied, setCopied] = useState(false)
+  const { setLoadingToast, updateLoadingToast, dismissToast } = useNotifications()
 
   // Wiki state
   const [structure, setStructure] = useState<WikiStructure | null>(null)
@@ -78,7 +81,7 @@ export default function ProductDocsPage() {
   const processEvent = (event: WikiEvent, currentPageIdRef: { value: string }, currentContentRef: { value: string }) => {
     switch (event.type) {
       case 'status':
-        setStatus(event.message)
+        updateLoadingToast(TOAST_ID, event.message)
         break
 
       case 'structure':
@@ -109,7 +112,7 @@ export default function ProductDocsPage() {
           },
         }))
         setActivePage(event.pageId)
-        setStatus(`Generating: ${event.title}...`)
+        updateLoadingToast(TOAST_ID, `Generating: ${event.title}...`)
         break
 
       case 'content':
@@ -146,7 +149,7 @@ export default function ProductDocsPage() {
         break
 
       case 'complete':
-        setStatus('')
+        dismissToast(TOAST_ID)
         break
 
       case 'error':
@@ -176,11 +179,14 @@ export default function ProductDocsPage() {
   }, [cacheKey])
 
   // Check for running job and reconnect if needed
-  const { reconnecting, status: reconnectStatus } = useWikiJobReconnection({
+  const { reconnecting } = useWikiJobReconnection({
     jobId: owner && repo ? JobIds.productDocs(owner, repo) : '',
     generator: () => generateProductDocs(owner!, repo!),
     processEvent,
     enabled: cacheChecked && !!owner && !!repo,
+    toastId: TOAST_ID,
+    setLoadingToast,
+    dismissToast,
   })
 
   useEffect(() => {
@@ -205,7 +211,7 @@ export default function ProductDocsPage() {
 
     setGenerating(true)
     setError('')
-    setStatus('Starting generation...')
+    setLoadingToast(TOAST_ID, 'Starting generation...')
     setStructure(null)
     setWikiState({})
 
@@ -220,9 +226,9 @@ export default function ProductDocsPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate product documentation')
+      dismissToast(TOAST_ID)
     } finally {
       setGenerating(false)
-      setStatus('')
     }
   }
 
@@ -329,14 +335,7 @@ export default function ProductDocsPage() {
         </Card>
       )}
 
-      {/* Status */}
-      {(status || reconnectStatus) && (
-        <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground border-b">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {reconnectStatus || status}
-        </div>
-      )}
-
+      
       {/* Main content */}
       <div className="flex flex-1 overflow-y-auto md:overflow-hidden">
         {/* Sidebar */}

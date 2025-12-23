@@ -4,6 +4,8 @@ const API_KEYS_STORAGE_KEY = 'productwiki_api_keys'
 const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider'
 const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model'
 const PLUS_ACCESS_CODE_KEY = 'productwiki_plus_access_code'
+const LOW_TPM_MODE_KEY = 'productwiki_low_tpm_mode'
+const TPM_LIMIT_KEY = 'productwiki_tpm_limit'
 
 export const DEFAULT_GEMINI_MODEL = 'gemma-3-27b-it'
 const PLUS_ACCESS_CODE = 'plus'
@@ -162,6 +164,23 @@ export function setPlusAccessCode(code: string): boolean {
   }
 }
 
+export function getLowTpmMode(): boolean {
+  return localStorage.getItem(LOW_TPM_MODE_KEY) === 'true'
+}
+
+export function setLowTpmMode(enabled: boolean): void {
+  localStorage.setItem(LOW_TPM_MODE_KEY, enabled.toString())
+}
+
+export function getTpmLimit(): number {
+  const stored = localStorage.getItem(TPM_LIMIT_KEY)
+  return stored ? parseInt(stored, 10) : 15000
+}
+
+export function setTpmLimit(limit: number): void {
+  localStorage.setItem(TPM_LIMIT_KEY, limit.toString())
+}
+
 function getHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -176,6 +195,11 @@ function getHeaders(): Record<string, string> {
   headers['X-LLM-Provider'] = provider
   const geminiModel = getGeminiModel()
   headers['X-Gemini-Model'] = geminiModel
+  // Add TPM rate limit headers
+  if (getLowTpmMode()) {
+    headers['X-Low-TPM-Mode'] = 'true'
+    headers['X-TPM-Limit'] = getTpmLimit().toString()
+  }
   return headers
 }
 

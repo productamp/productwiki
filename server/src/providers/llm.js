@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/index.js';
 import { logError } from '../services/errorLog.js';
 import { getKeyPool, isRateLimitError, sleep } from './api-key-pool.js';
+import { checkTpmAllowance, recordTokenUsage, estimateTokens } from './tpm-tracker.js';
 
 /**
  * Check if a model is a Gemma model (doesn't support systemInstruction)
@@ -14,11 +15,10 @@ function isGemmaModel(model) {
  * Get LLM model for a specific API key and system prompt
  */
 function getClient(apiKey, systemPrompt, model) {
-  const key = apiKey || process.env.GOOGLE_API_KEY;
-  if (!key) {
-    throw new Error('Google API key is required. Set it in Settings or GOOGLE_API_KEY environment variable.');
+  if (!apiKey) {
+    throw new Error('Google API key is required.');
   }
-  const genAI = new GoogleGenerativeAI(key);
+  const genAI = new GoogleGenerativeAI(apiKey);
   const modelName = model || config.llmModel;
 
   // Gemma models don't support systemInstruction
@@ -98,18 +98,21 @@ async function* streamChatWithKey(systemPrompt, messages, apiKey, model) {
  * @param {Array} messages - Chat messages
  * @param {string|string[]} apiKeys - Single key or array of keys
  * @param {string} model - Model name
+ * @param {Object} tpmOptions - TPM rate limit options { lowTpmMode, tpmLimit }
  */
-export async function* streamChat(systemPrompt, messages, apiKeys, model) {
+export async function* streamChat(systemPrompt, messages, apiKeys, model, tpmOptions = {}) {
+  const { lowTpmMode, tpmLimit = 15000 } = tpmOptions;
+
   // Normalize to array
   const keys = Array.isArray(apiKeys) ? apiKeys : [apiKeys].filter(Boolean);
 
-  // Add env fallback if no keys provided
-  if (keys.length === 0 && process.env.GOOGLE_API_KEY) {
-    keys.push(process.env.GOOGLE_API_KEY);
+  // Add server-side keys as fallback if no user keys provided
+  if (keys.length === 0 && config.googleApiKeys.length > 0) {
+    keys.push(...config.googleApiKeys);
   }
 
   if (keys.length === 0) {
-    throw new Error('Google API key is required. Set it in Settings or GOOGLE_API_KEY environment variable.');
+    throw new Error('Google API key is required. Set it in Settings or GOOGLE_API_KEYS environment variable.');
   }
 
   // Get persistent pool for LLM
@@ -117,6 +120,13 @@ export async function* streamChat(systemPrompt, messages, apiKeys, model) {
 
   let streamRetries = 0;
   const MAX_STREAM_RETRIES = 2;
+
+  // Calculate estimated tokens for TPM tracking
+  const inputChars = (systemPrompt?.length || 0) +
+    messages.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+  const estimatedInputTokens = estimateTokens(inputChars);
+  // Estimate output as roughly equal to input (conservative)
+  const estimatedTotalTokens = estimatedInputTokens * 2;
 
   while (true) {
     const available = pool.getAvailableKey();
@@ -132,10 +142,34 @@ export async function* streamChat(systemPrompt, messages, apiKeys, model) {
     }
 
     const { key, label, index } = available;
+    // Use last 8 chars of key as ID for TPM tracking
+    const keyId = typeof key === 'string' ? key.slice(-8) : (key.key?.slice(-8) || `key-${index}`);
+
+    // Check TPM allowance if low TPM mode is enabled
+    if (lowTpmMode) {
+      const check = checkTpmAllowance(keyId, estimatedTotalTokens, tpmLimit);
+      if (!check.allowed) {
+        const waitSeconds = Math.ceil(check.waitMs / 1000);
+        console.log(`[TPM] Waiting ${waitSeconds}s before request (${check.currentUsage}/${tpmLimit} tokens used)`);
+        await sleep(check.waitMs);
+      }
+    }
+
     console.log(`[LLM] Using "${label}" (index ${index})`);
 
     try {
-      yield* streamChatWithKey(systemPrompt, messages, key, model);
+      let outputChars = 0;
+      for await (const chunk of streamChatWithKey(systemPrompt, messages, key, model)) {
+        outputChars += chunk.length;
+        yield chunk;
+      }
+
+      // Record actual token usage after successful streaming
+      if (lowTpmMode) {
+        const actualTokens = estimateTokens(inputChars + outputChars);
+        recordTokenUsage(keyId, actualTokens);
+      }
+
       return;
     } catch (err) {
       if (isRateLimitError(err)) {

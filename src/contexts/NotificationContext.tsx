@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 import { getServerLogs, clearServerLogs } from '@/lib/api'
 
-export type NotificationType = 'error' | 'warning' | 'info' | 'success'
+export type NotificationType = 'error' | 'warning' | 'info' | 'success' | 'loading'
 
 export interface Notification {
   id: string
@@ -25,6 +25,8 @@ interface NotificationContextType {
   unreadCount: number
   addNotification: (type: NotificationType, message: string, summary?: string) => void
   addToast: (type: NotificationType, message: string, autoDismiss?: boolean) => void
+  setLoadingToast: (id: string, message: string) => void
+  updateLoadingToast: (id: string, message: string) => void
   dismissToast: (id: string) => void
   markAllRead: () => void
   clearNotifications: () => void
@@ -193,6 +195,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const setLoadingToast = useCallback((id: string, message: string) => {
+    setToasts((prev) => {
+      // Remove existing toast with same ID if any
+      const filtered = prev.filter((t) => t.id !== id)
+      return [...filtered, { id, type: 'loading' as NotificationType, message, autoDismiss: false }]
+    })
+  }, [])
+
+  const updateLoadingToast = useCallback((id: string, message: string) => {
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, message } : t)))
+  }, [])
+
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
@@ -271,6 +285,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         unreadCount,
         addNotification,
         addToast,
+        setLoadingToast,
+        updateLoadingToast,
         dismissToast,
         markAllRead,
         clearNotifications,

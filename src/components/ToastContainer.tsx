@@ -1,11 +1,11 @@
-import { AlertCircle, AlertTriangle, Info, CheckCircle, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Info, CheckCircle, X, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNotifications, NotificationType } from '@/contexts/NotificationContext'
 import { cn } from '@/lib/utils'
 
 const typeConfig: Record<
   NotificationType,
-  { icon: typeof AlertCircle; bgColor: string; textColor: string; borderColor: string }
+  { icon: typeof AlertCircle; bgColor: string; textColor: string; borderColor: string; animate?: boolean }
 > = {
   error: {
     icon: AlertCircle,
@@ -31,6 +31,13 @@ const typeConfig: Record<
     textColor: 'text-green-600',
     borderColor: 'border-green-500/30',
   },
+  loading: {
+    icon: Loader2,
+    bgColor: 'bg-muted',
+    textColor: 'text-foreground',
+    borderColor: 'border-border',
+    animate: true,
+  },
 }
 
 export function ToastContainer() {
@@ -53,7 +60,7 @@ export function ToastContainer() {
               config.borderColor
             )}
           >
-            <Icon className={cn('h-5 w-5 flex-shrink-0 mt-0.5', config.textColor)} />
+            <Icon className={cn('h-5 w-5 flex-shrink-0 mt-0.5', config.textColor, config.animate && 'animate-spin')} />
             <p className={cn('text-sm font-medium flex-1', config.textColor)}>{toast.message}</p>
             <Button
               variant="ghost"

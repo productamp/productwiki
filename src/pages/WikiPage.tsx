@@ -15,6 +15,7 @@ import {
   type WikiEvent,
 } from '@/lib/api'
 import { useWikiJobReconnection } from '@/hooks/useJobReconnection'
+import { useNotifications } from '@/contexts/NotificationContext'
 import {
   Loader2,
   Copy,
@@ -37,14 +38,16 @@ interface WikiState {
   [pageId: string]: PageState
 }
 
+const TOAST_ID = 'wiki-status'
+
 export default function WikiPage() {
   const { owner, repo, type } = useParams<{ owner: string; repo: string; type: string }>()
   const [project, setProject] = useState<ProjectMetadata | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [generating, setGenerating] = useState(false)
-  const [status, setStatus] = useState('')
   const [copied, setCopied] = useState(false)
+  const { setLoadingToast, updateLoadingToast, dismissToast } = useNotifications()
 
   // Wiki state
   const [structure, setStructure] = useState<WikiStructure | null>(null)
@@ -80,7 +83,7 @@ export default function WikiPage() {
   const processEvent = (event: WikiEvent, currentPageIdRef: { value: string }, currentContentRef: { value: string }) => {
     switch (event.type) {
       case 'status':
-        setStatus(event.message)
+        updateLoadingToast(TOAST_ID, event.message)
         break
 
       case 'structure':
@@ -111,7 +114,7 @@ export default function WikiPage() {
           },
         }))
         setActivePage(event.pageId)
-        setStatus(`Generating: ${event.title}...`)
+        updateLoadingToast(TOAST_ID, `Generating: ${event.title}...`)
         break
 
       case 'content':
@@ -148,7 +151,7 @@ export default function WikiPage() {
         break
 
       case 'complete':
-        setStatus('')
+        dismissToast(TOAST_ID)
         break
 
       case 'error':
@@ -178,7 +181,7 @@ export default function WikiPage() {
   }, [cacheKey])
 
   // Check for running job and reconnect if needed
-  const { reconnecting, status: reconnectStatus } = useWikiJobReconnection({
+  const { reconnecting } = useWikiJobReconnection({
     jobId: owner && repo
       ? (wikiType === 'brief' ? JobIds.briefWiki(owner, repo) : JobIds.detailedWiki(owner, repo))
       : '',
@@ -187,6 +190,9 @@ export default function WikiPage() {
       : generateDetailedWiki(owner!, repo!),
     processEvent,
     enabled: cacheChecked && !!owner && !!repo,
+    toastId: TOAST_ID,
+    setLoadingToast,
+    dismissToast,
   })
 
   useEffect(() => {
@@ -211,7 +217,7 @@ export default function WikiPage() {
 
     setGenerating(true)
     setError('')
-    setStatus('Starting generation...')
+    setLoadingToast(TOAST_ID, 'Starting generation...')
     setStructure(null)
     setWikiState({})
 
@@ -228,9 +234,9 @@ export default function WikiPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate wiki')
+      dismissToast(TOAST_ID)
     } finally {
       setGenerating(false)
-      setStatus('')
     }
   }
 
@@ -335,14 +341,6 @@ export default function WikiPage() {
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Status */}
-      {(status || reconnectStatus) && (
-        <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground border-b">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {reconnectStatus || status}
-        </div>
       )}
 
       {/* Main content */}
