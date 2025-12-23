@@ -73,9 +73,10 @@ function createWikiHandler(type, generator) {
     const job = createJob(jobId);
 
     const options = {
+      preset: c.get('preset'),
       apiKeys: c.get('apiKeys'),
-      provider: c.get('llmProvider'),
-      model: c.get('geminiModel'),
+      groqApiKeys: c.get('groqApiKeys'),
+      jinaApiKey: c.get('jinaApiKey'),
       lowTpmMode: c.get('lowTpmMode'),
       tpmLimit: c.get('tpmLimit'),
     };

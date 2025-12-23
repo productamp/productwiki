@@ -19,9 +19,12 @@ const app = new Hono();
 app.use('*', logger());
 app.use('*', cors());
 
-// Extract API keys, provider, and model from headers into context
+// Extract preset and API keys from headers into context
 app.use('*', async (c, next) => {
-  // Parse API keys array from header, fallback to single key
+  // Preset (new system)
+  c.set('preset', c.req.header('x-preset') || null);
+
+  // Google API keys (for gemini/gemma presets)
   const apiKeysHeader = c.req.header('x-api-keys');
   let apiKeys = [];
   if (apiKeysHeader) {
@@ -40,11 +43,30 @@ app.use('*', async (c, next) => {
   }
   c.set('apiKeys', apiKeys);
   c.set('apiKey', apiKeys[0] || null); // Keep for backwards compat
+
+  // Groq API keys (for best-free-cloud preset, optional - server has fallback)
+  const groqApiKeysHeader = c.req.header('x-groq-api-keys');
+  let groqApiKeys = [];
+  if (groqApiKeysHeader) {
+    try {
+      groqApiKeys = JSON.parse(groqApiKeysHeader);
+    } catch {
+      groqApiKeys = [];
+    }
+  }
+  c.set('groqApiKeys', groqApiKeys);
+
+  // Jina API key (for best-free-cloud preset, optional - server has fallback)
+  c.set('jinaApiKey', c.req.header('x-jina-api-key') || null);
+
+  // Legacy fields (kept for backwards compat)
   c.set('llmProvider', c.req.header('x-llm-provider'));
   c.set('geminiModel', c.req.header('x-gemini-model'));
-  // TPM rate limit settings
+
+  // TPM rate limit settings (for gemini/gemma presets)
   c.set('lowTpmMode', c.req.header('x-low-tpm-mode') === 'true');
   c.set('tpmLimit', parseInt(c.req.header('x-tpm-limit') || '0', 10) || 15000);
+
   await next();
 });
 

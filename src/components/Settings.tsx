@@ -5,8 +5,8 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog'
-import { Settings as SettingsIcon, Check, Plus, X, Crown, Package, RefreshCw, BookOpen } from 'lucide-react'
-import { getApiKeyEntries, setApiKeyEntries, getProvider, setProvider, getGeminiModel, setGeminiModel, isPlusUser, setPlusAccessCode, getLowTpmMode, setLowTpmMode as setLowTpmModeStorage, getTpmLimit, setTpmLimit as setTpmLimitStorage, DEFAULT_GEMINI_MODEL, type LlmProvider, type ApiKeyEntry } from '@/lib/api'
+import { Settings as SettingsIcon, Check, Plus, X, Crown, Package, RefreshCw, BookOpen, Zap, Cloud, Server } from 'lucide-react'
+import { getApiKeyEntries, setApiKeyEntries, getPreset, setPreset, isPlusUser, setPlusAccessCode, getLowTpmMode, setLowTpmMode as setLowTpmModeStorage, getTpmLimit, setTpmLimit as setTpmLimitStorage, PRESETS, type Preset, type ApiKeyEntry } from '@/lib/api'
 
 interface SettingsProps {
   open: boolean
@@ -18,8 +18,7 @@ type SettingsTab = 'ai-providers' | 'plus'
 export function Settings({ open, onOpenChange }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('ai-providers')
   const [apiKeys, setApiKeysState] = useState<ApiKeyEntry[]>([{ key: '', label: '' }])
-  const [provider, setProviderState] = useState<LlmProvider>('gemini')
-  const [geminiModel, setGeminiModelState] = useState(DEFAULT_GEMINI_MODEL)
+  const [preset, setPresetState] = useState<Preset>('best-free-cloud')
   const [plusAccessCode, setPlusAccessCodeState] = useState('')
   const [isPlusActive, setIsPlusActive] = useState(false)
   const [lowTpmMode, setLowTpmMode] = useState(false)
@@ -30,8 +29,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
     if (open) {
       const entries = getApiKeyEntries()
       setApiKeysState(entries.length > 0 ? entries : [{ key: '', label: '' }])
-      setProviderState(getProvider())
-      setGeminiModelState(getGeminiModel())
+      setPresetState(getPreset())
       setIsPlusActive(isPlusUser())
       setLowTpmMode(getLowTpmMode())
       setTpmLimit(getTpmLimit())
@@ -50,8 +48,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
         label: e.label.trim() || `Key ${i + 1}`,
       }))
     setApiKeyEntries(filtered)
-    setProvider(provider)
-    setGeminiModel(geminiModel)
+    setPreset(preset)
     setLowTpmModeStorage(lowTpmMode)
     setTpmLimitStorage(tpmLimit)
 
@@ -91,6 +88,8 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
     newKeys[index] = { ...newKeys[index], [field]: value }
     setApiKeysState(newKeys)
   }
+
+  const presetRequiresGoogleKey = preset === 'gemini-cloud' || preset === 'gemma-cloud'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,34 +133,129 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
               {activeTab === 'ai-providers' && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">AI Providers</h3>
+                    <h3 className="text-lg font-semibold mb-1">AI Provider Preset</h3>
                     <p className="text-sm text-muted-foreground">
-                      Configure your LLM provider for embeddings and generation
+                      Choose how to run embeddings and text generation
                     </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">LLM Provider</label>
-                    <div className="flex gap-2">
-                      <Button
-                        variant={provider === 'gemini' ? 'default' : 'outline'}
-                        onClick={() => setProviderState('gemini')}
-                        className="flex-1"
-                      >
-                        Gemini
-                      </Button>
-                      <Button
-                        variant={provider === 'ollama' ? 'default' : 'outline'}
-                        onClick={() => setProviderState('ollama')}
-                        className="flex-1"
-                      >
-                        Ollama
-                      </Button>
-                    </div>
+                  {/* Preset Selection */}
+                  <div className="space-y-3">
+                    {/* Best Free Cloud - Recommended */}
+                    <button
+                      onClick={() => setPresetState('best-free-cloud')}
+                      className={`w-full p-4 text-left rounded-lg border-2 transition-colors ${
+                        preset === 'best-free-cloud'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 p-2 rounded-lg ${preset === 'best-free-cloud' ? 'bg-primary/10' : 'bg-muted'}`}>
+                          <Zap className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{PRESETS['best-free-cloud'].name}</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
+                              Recommended
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {PRESETS['best-free-cloud'].description}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Uses Groq (Llama 4) + Jina AI embeddings
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Gemini Cloud */}
+                    <button
+                      onClick={() => setPresetState('gemini-cloud')}
+                      className={`w-full p-4 text-left rounded-lg border-2 transition-colors ${
+                        preset === 'gemini-cloud'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 p-2 rounded-lg ${preset === 'gemini-cloud' ? 'bg-primary/10' : 'bg-muted'}`}>
+                          <Cloud className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{PRESETS['gemini-cloud'].name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {PRESETS['gemini-cloud'].description}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Requires Google API key
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Gemma Cloud */}
+                    <button
+                      onClick={() => setPresetState('gemma-cloud')}
+                      className={`w-full p-4 text-left rounded-lg border-2 transition-colors ${
+                        preset === 'gemma-cloud'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 p-2 rounded-lg ${preset === 'gemma-cloud' ? 'bg-primary/10' : 'bg-muted'}`}>
+                          <Cloud className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{PRESETS['gemma-cloud'].name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {PRESETS['gemma-cloud'].description}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Requires Google API key
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Local LLM */}
+                    <button
+                      onClick={() => setPresetState('local-llm')}
+                      className={`w-full p-4 text-left rounded-lg border-2 transition-colors ${
+                        preset === 'local-llm'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 p-2 rounded-lg ${preset === 'local-llm' ? 'bg-primary/10' : 'bg-muted'}`}>
+                          <Server className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{PRESETS['local-llm'].name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {PRESETS['local-llm'].description}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Requires Ollama running locally
+                          </p>
+                        </div>
+                      </div>
+                    </button>
                   </div>
 
-                  {provider === 'gemini' && (
-                    <div className="space-y-4">
+                  {/* Conditional Settings based on preset */}
+                  {presetRequiresGoogleKey && (
+                    <div className="space-y-4 pt-4 border-t">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <label className="text-sm font-medium">Google API Keys</label>
@@ -219,18 +313,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                           </a>
                         </p>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Model</label>
-                        <Input
-                          type="text"
-                          placeholder={DEFAULT_GEMINI_MODEL}
-                          value={geminiModel}
-                          onChange={(e) => setGeminiModelState(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Default: {DEFAULT_GEMINI_MODEL}
-                        </p>
-                      </div>
+
                       <div className="space-y-2 pt-4 border-t">
                         <div className="flex items-center justify-between">
                           <label className="text-sm font-medium">Low TPM Mode</label>
@@ -256,7 +339,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                               />
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              Reduces context sizes and adds delays to stay within token limits. For Gemma-3-27b use 15000.
+                              Reduces context sizes and adds delays to stay within token limits.
                             </p>
                           </div>
                         )}
@@ -264,7 +347,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                     </div>
                   )}
 
-                  {provider === 'ollama' && (
+                  {preset === 'local-llm' && (
                     <div className="space-y-2 p-3 bg-muted rounded-md">
                       <p className="text-sm">
                         Ollama runs locally - no API key required.
