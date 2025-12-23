@@ -1,6 +1,7 @@
 const BASE_URL = import.meta.env.VITE_API_URL || window.location.origin
 const API_KEY_STORAGE_KEY = 'productwiki_api_key'
 const API_KEYS_STORAGE_KEY = 'productwiki_api_keys'
+const GROQ_API_KEYS_STORAGE_KEY = 'productwiki_groq_api_keys'
 const PRESET_STORAGE_KEY = 'productwiki_preset'
 const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider' // Legacy, kept for migration
 const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model' // Legacy
@@ -12,8 +13,8 @@ export const DEFAULT_GEMINI_MODEL = 'gemma-3-27b-it'
 const PLUS_ACCESS_CODE = 'plus'
 
 // Preset types
-export type Preset = 'gemini-cloud' | 'gemma-cloud' | 'best-free-cloud' | 'local-llm'
-export const DEFAULT_PRESET: Preset = 'best-free-cloud'
+export type Preset = 'gemini-cloud' | 'groq-cloud' | 'local-llm'
+export const DEFAULT_PRESET: Preset = 'groq-cloud'
 
 // Preset definitions (mirror of server/src/config/presets.js)
 export const PRESETS: Record<Preset, {
@@ -28,15 +29,9 @@ export const PRESETS: Record<Preset, {
     description: 'Google Gemini Flash - fast and capable',
     requiresApiKey: 'google',
   },
-  'gemma-cloud': {
-    id: 'gemma-cloud',
-    name: 'Gemma Cloud',
-    description: 'Google Gemma 3 27B - open model on Google infrastructure',
-    requiresApiKey: 'google',
-  },
-  'best-free-cloud': {
-    id: 'best-free-cloud',
-    name: 'Best Free Cloud',
+  'groq-cloud': {
+    id: 'groq-cloud',
+    name: 'Groq Cloud',
     description: 'Groq + Gemini embeddings - no API key required',
     requiresApiKey: null,
   },
@@ -168,6 +163,28 @@ export function setApiKeys(keys: string[]): void {
   setApiKeyEntries(entries)
 }
 
+// Groq API key functions
+export function getGroqApiKeyEntries(): ApiKeyEntry[] {
+  const stored = localStorage.getItem(GROQ_API_KEYS_STORAGE_KEY)
+  if (stored) {
+    try {
+      return JSON.parse(stored) as ApiKeyEntry[]
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+export function setGroqApiKeyEntries(entries: ApiKeyEntry[]): void {
+  const filtered = entries.filter(e => e.key.trim())
+  if (filtered.length > 0) {
+    localStorage.setItem(GROQ_API_KEYS_STORAGE_KEY, JSON.stringify(filtered))
+  } else {
+    localStorage.removeItem(GROQ_API_KEYS_STORAGE_KEY)
+  }
+}
+
 // Preset functions
 export function getPreset(): Preset {
   const stored = localStorage.getItem(PRESET_STORAGE_KEY) as Preset | null
@@ -179,10 +196,10 @@ export function getPreset(): Preset {
   if (oldProvider === 'ollama') {
     return 'local-llm'
   }
-  // Check if they had API keys - if so, default to gemma-cloud for backwards compat
+  // Check if they had API keys - if so, default to gemini-cloud for backwards compat
   const hasApiKeys = getApiKeyEntries().length > 0
   if (hasApiKeys) {
-    return 'gemma-cloud'
+    return 'gemini-cloud'
   }
   return DEFAULT_PRESET
 }
@@ -255,8 +272,8 @@ function getHeaders(): Record<string, string> {
   const preset = getPreset()
   headers['X-Preset'] = preset
 
-  // For gemini/gemma presets, include Google API keys
-  if (preset === 'gemini-cloud' || preset === 'gemma-cloud') {
+  // For gemini preset, include Google API keys
+  if (preset === 'gemini-cloud') {
     const apiKeyEntries = getApiKeyEntries()
     if (apiKeyEntries.length > 0) {
       headers['X-API-Keys'] = JSON.stringify(apiKeyEntries)
@@ -266,6 +283,21 @@ function getHeaders(): Record<string, string> {
     if (getLowTpmMode()) {
       headers['X-Low-TPM-Mode'] = 'true'
       headers['X-TPM-Limit'] = getTpmLimit().toString()
+    }
+  }
+
+  // For groq-cloud preset, include Groq API keys (optional - server has fallback)
+  // Also include Google API keys for embeddings (groq uses Gemini for embeddings)
+  if (preset === 'groq-cloud') {
+    const groqKeyEntries = getGroqApiKeyEntries()
+    if (groqKeyEntries.length > 0) {
+      headers['X-Groq-API-Keys'] = JSON.stringify(groqKeyEntries)
+    }
+    // Google keys for embeddings (optional - server has fallback)
+    const apiKeyEntries = getApiKeyEntries()
+    if (apiKeyEntries.length > 0) {
+      headers['X-API-Keys'] = JSON.stringify(apiKeyEntries)
+      headers['X-API-Key'] = apiKeyEntries[0].key
     }
   }
 
@@ -298,6 +330,63 @@ export async function* indexRepoStream(
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error || 'Failed to index repository')
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('No response body')
+  }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6)
+        try {
+          const parsed = JSON.parse(data) as IndexProgress
+          yield parsed
+          if (parsed.phase === 'done' || parsed.phase === 'error' || parsed.phase === 'cancelled') {
+            return
+          }
+        } catch {
+          // Skip non-JSON lines
+        }
+      }
+    }
+  }
+}
+
+export interface LocalFileData {
+  path: string
+  content: string
+}
+
+export async function* indexLocalStream(
+  projectName: string,
+  files: LocalFileData[],
+  signal?: AbortSignal
+): AsyncGenerator<IndexProgress> {
+  const response = await fetch(`${BASE_URL}/index/local`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ projectName, files }),
+    signal,
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to index local directory')
   }
 
   const reader = response.body?.getReader()

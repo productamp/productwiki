@@ -45,7 +45,7 @@ app.use('*', async (c, next) => {
   c.set('apiKeys', apiKeys);
   c.set('apiKey', apiKeys[0] || null); // Keep for backwards compat
 
-  // Groq API keys (for best-free-cloud preset, optional - server has fallback)
+  // Groq API keys (for groq-cloud preset, optional - server has fallback)
   const groqApiKeysHeader = c.req.header('x-groq-api-keys');
   let groqApiKeys = [];
   if (groqApiKeysHeader) {

@@ -11,7 +11,7 @@ interface AboutDialogProps {
 export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden" onClose={() => onOpenChange(false)}>
+      <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden">
         <div className="max-h-[85vh] overflow-y-auto">
           <div className="p-6">
             <DialogHeader className="mb-6">
