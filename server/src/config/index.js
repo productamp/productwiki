@@ -151,6 +151,10 @@ export const config = {
   ollamaEmbeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
   ollamaEmbeddingDimensions: 768, // nomic-embed-text default, auto-detected at runtime
 
+  // Groq settings (fallback keys for 'best-free-cloud' preset)
+  groqApiKeys: parseApiKeys(process.env.GROQ_API_KEYS) ||
+    (process.env.GROQ_API_KEY ? [{ key: process.env.GROQ_API_KEY, label: 'Default' }] : []),
+
   // Server
   port: 3847,
 };

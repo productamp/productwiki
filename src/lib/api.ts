@@ -1,8 +1,9 @@
 const BASE_URL = import.meta.env.VITE_API_URL || window.location.origin
 const API_KEY_STORAGE_KEY = 'productwiki_api_key'
 const API_KEYS_STORAGE_KEY = 'productwiki_api_keys'
-const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider'
-const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model'
+const PRESET_STORAGE_KEY = 'productwiki_preset'
+const PROVIDER_STORAGE_KEY = 'productwiki_llm_provider' // Legacy, kept for migration
+const GEMINI_MODEL_STORAGE_KEY = 'productwiki_gemini_model' // Legacy
 const PLUS_ACCESS_CODE_KEY = 'productwiki_plus_access_code'
 const LOW_TPM_MODE_KEY = 'productwiki_low_tpm_mode'
 const TPM_LIMIT_KEY = 'productwiki_tpm_limit'
@@ -10,6 +11,44 @@ const TPM_LIMIT_KEY = 'productwiki_tpm_limit'
 export const DEFAULT_GEMINI_MODEL = 'gemma-3-27b-it'
 const PLUS_ACCESS_CODE = 'plus'
 
+// Preset types
+export type Preset = 'gemini-cloud' | 'gemma-cloud' | 'best-free-cloud' | 'local-llm'
+export const DEFAULT_PRESET: Preset = 'best-free-cloud'
+
+// Preset definitions (mirror of server/src/config/presets.js)
+export const PRESETS: Record<Preset, {
+  id: Preset
+  name: string
+  description: string
+  requiresApiKey: 'google' | null
+}> = {
+  'gemini-cloud': {
+    id: 'gemini-cloud',
+    name: 'Gemini Cloud',
+    description: 'Google Gemini Flash - fast and capable',
+    requiresApiKey: 'google',
+  },
+  'gemma-cloud': {
+    id: 'gemma-cloud',
+    name: 'Gemma Cloud',
+    description: 'Google Gemma 3 27B - open model on Google infrastructure',
+    requiresApiKey: 'google',
+  },
+  'best-free-cloud': {
+    id: 'best-free-cloud',
+    name: 'Best Free Cloud',
+    description: 'Groq + Gemini embeddings - no API key required',
+    requiresApiKey: null,
+  },
+  'local-llm': {
+    id: 'local-llm',
+    name: 'Local LLM',
+    description: 'Ollama - runs entirely on your machine',
+    requiresApiKey: null,
+  },
+}
+
+// Legacy type (kept for backwards compat)
 export type LlmProvider = 'gemini' | 'ollama'
 
 export interface ApiKeyEntry {
@@ -129,6 +168,30 @@ export function setApiKeys(keys: string[]): void {
   setApiKeyEntries(entries)
 }
 
+// Preset functions
+export function getPreset(): Preset {
+  const stored = localStorage.getItem(PRESET_STORAGE_KEY) as Preset | null
+  if (stored && stored in PRESETS) {
+    return stored
+  }
+  // Migrate from old provider setting
+  const oldProvider = localStorage.getItem(PROVIDER_STORAGE_KEY)
+  if (oldProvider === 'ollama') {
+    return 'local-llm'
+  }
+  // Check if they had API keys - if so, default to gemma-cloud for backwards compat
+  const hasApiKeys = getApiKeyEntries().length > 0
+  if (hasApiKeys) {
+    return 'gemma-cloud'
+  }
+  return DEFAULT_PRESET
+}
+
+export function setPreset(preset: Preset): void {
+  localStorage.setItem(PRESET_STORAGE_KEY, preset)
+}
+
+// Legacy functions (kept for backwards compat)
 export function getProvider(): LlmProvider {
   return (localStorage.getItem(PROVIDER_STORAGE_KEY) as LlmProvider) || 'gemini'
 }
@@ -187,21 +250,25 @@ function getHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
-  const apiKeyEntries = getApiKeyEntries()
-  if (apiKeyEntries.length > 0) {
-    headers['X-API-Keys'] = JSON.stringify(apiKeyEntries)
-    // Also set single key for backwards compat
-    headers['X-API-Key'] = apiKeyEntries[0].key
+
+  // Set preset header
+  const preset = getPreset()
+  headers['X-Preset'] = preset
+
+  // For gemini/gemma presets, include Google API keys
+  if (preset === 'gemini-cloud' || preset === 'gemma-cloud') {
+    const apiKeyEntries = getApiKeyEntries()
+    if (apiKeyEntries.length > 0) {
+      headers['X-API-Keys'] = JSON.stringify(apiKeyEntries)
+      headers['X-API-Key'] = apiKeyEntries[0].key
+    }
+    // Add TPM rate limit headers for Gemini presets
+    if (getLowTpmMode()) {
+      headers['X-Low-TPM-Mode'] = 'true'
+      headers['X-TPM-Limit'] = getTpmLimit().toString()
+    }
   }
-  const provider = getProvider()
-  headers['X-LLM-Provider'] = provider
-  const geminiModel = getGeminiModel()
-  headers['X-Gemini-Model'] = geminiModel
-  // Add TPM rate limit headers
-  if (getLowTpmMode()) {
-    headers['X-Low-TPM-Mode'] = 'true'
-    headers['X-TPM-Limit'] = getTpmLimit().toString()
-  }
+
   return headers
 }
 

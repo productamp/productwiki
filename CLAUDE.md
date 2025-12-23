@@ -6,10 +6,14 @@ ProductQ is a RAG-powered codebase documentation and Q&A tool. It indexes GitHub
 
 ## Tech Stack
 
-- **Frontend**: React + TypeScript + Vite + TailwindCSS
+- **Frontend**: React + TypeScript + Vite + TailwindCSS + shadcn/ui
 - **Backend**: Hono.js (Node.js)
 - **Vector Database**: LanceDB
 - **LLM Provider**: Google Gemini API
+
+## Design System
+
+Always use [shadcn/ui](https://ui.shadcn.com/) components as the default for all UI elements. Components are located in `src/components/ui/`. When adding new UI functionality, first check if shadcn has a component for it and install it using `npx shadcn@latest add <component>`.
 
 ## Local Development
 

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
+import { toast } from 'sonner'
 import { getServerLogs, clearServerLogs } from '@/lib/api'
 
 export type NotificationType = 'error' | 'warning' | 'info' | 'success' | 'loading'
@@ -12,16 +13,8 @@ export interface Notification {
   read: boolean
 }
 
-export interface Toast {
-  id: string
-  type: NotificationType
-  message: string
-  autoDismiss?: boolean
-}
-
 interface NotificationContextType {
   notifications: Notification[]
-  toasts: Toast[]
   unreadCount: number
   addNotification: (type: NotificationType, message: string, summary?: string) => void
   addToast: (type: NotificationType, message: string, autoDismiss?: boolean) => void
@@ -161,7 +154,6 @@ function extractTimestamp(log: string): Date {
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [toasts, setToasts] = useState<Toast[]>([])
   const [lastLogCount, setLastLogCount] = useState(0)
 
   const unreadCount = notifications.filter((n) => !n.read).length
@@ -179,36 +171,39 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addToast = useCallback((type: NotificationType, message: string, autoDismiss = true) => {
-    const toast: Toast = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      type,
-      message,
-      autoDismiss,
-    }
-    setToasts((prev) => [...prev, toast])
+    const duration = autoDismiss ? (type === 'error' ? 8000 : 4000) : Infinity
 
-    // Auto-dismiss after delay
-    if (autoDismiss) {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== toast.id))
-      }, type === 'error' ? 8000 : 4000)
+    switch (type) {
+      case 'error':
+        toast.error(message, { duration })
+        break
+      case 'warning':
+        toast.warning(message, { duration })
+        break
+      case 'success':
+        toast.success(message, { duration })
+        break
+      case 'info':
+        toast.info(message, { duration })
+        break
+      case 'loading':
+        toast.loading(message)
+        break
+      default:
+        toast(message, { duration })
     }
   }, [])
 
   const setLoadingToast = useCallback((id: string, message: string) => {
-    setToasts((prev) => {
-      // Remove existing toast with same ID if any
-      const filtered = prev.filter((t) => t.id !== id)
-      return [...filtered, { id, type: 'loading' as NotificationType, message, autoDismiss: false }]
-    })
+    toast.loading(message, { id })
   }, [])
 
   const updateLoadingToast = useCallback((id: string, message: string) => {
-    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, message } : t)))
+    toast.loading(message, { id })
   }, [])
 
   const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
+    toast.dismiss(id)
   }, [])
 
   const markAllRead = useCallback(() => {
@@ -281,7 +276,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     <NotificationContext.Provider
       value={{
         notifications,
-        toasts,
         unreadCount,
         addNotification,
         addToast,

@@ -23,8 +23,9 @@ indexRoutes.post('/index', async (c) => {
 
     try {
       const options = {
+        preset: c.get('preset'),
         apiKeys: c.get('apiKeys'),
-        provider: c.get('llmProvider'),
+        groqApiKeys: c.get('groqApiKeys'),
         signal: abortSignal,
       };
 
