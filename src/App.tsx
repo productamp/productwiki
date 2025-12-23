@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { NotificationProvider } from './contexts/NotificationContext'
-import { ToastContainer } from './components/ToastContainer'
+import { Toaster } from './components/ui/sonner'
 import HomePage from './pages/HomePage'
 import RepoPage from './pages/RepoPage'
 import DocumentationPage from './pages/DocumentationPage'
@@ -22,7 +22,7 @@ function App() {
           <Route path="/repo/:owner/:repo/wiki/:type" element={<WikiPage />} />
           <Route path="/repo/:owner/:repo/product-docs" element={<ProductDocsPage />} />
         </Routes>
-        <ToastContainer />
+        <Toaster />
       </NotificationProvider>
     </BrowserRouter>
   )

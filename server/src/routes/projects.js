@@ -2,22 +2,16 @@ import { Hono } from 'hono';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from '../config/index.js';
+import { resolvePreset } from '../providers/index.js';
 
 /**
- * Get current embedding config based on provider
+ * Get current embedding config from preset
  */
-function getCurrentEmbeddingConfig(provider) {
-  if (provider === 'ollama') {
-    return {
-      provider: 'ollama',
-      model: config.ollamaEmbeddingModel,
-      dimensions: config.ollamaEmbeddingDimensions,
-    };
-  }
+function getCurrentEmbeddingConfig(preset) {
   return {
-    provider: 'gemini',
-    model: config.embeddingModel,
-    dimensions: config.embeddingDimensions,
+    provider: preset.embedding.provider,
+    model: preset.embedding.model,
+    dimensions: preset.embedding.dimensions,
   };
 }
 
@@ -92,9 +86,9 @@ projectsRoutes.get('/projects/:owner/:repo', async (c) => {
     const content = await readFile(metaPath, 'utf-8');
     const metadata = JSON.parse(content);
 
-    // Check embedding compatibility with current provider
-    const currentProvider = c.get('llmProvider') || config.llmProvider;
-    const currentEmbedding = getCurrentEmbeddingConfig(currentProvider);
+    // Check embedding compatibility with current preset
+    const preset = resolvePreset({ preset: c.get('preset') });
+    const currentEmbedding = getCurrentEmbeddingConfig(preset);
     const compatibility = checkEmbeddingCompatibility(metadata.embedding, currentEmbedding);
 
     return c.json({

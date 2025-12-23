@@ -37,7 +37,7 @@ export const PRESETS: Record<Preset, {
   'best-free-cloud': {
     id: 'best-free-cloud',
     name: 'Best Free Cloud',
-    description: 'Groq + Jina - no API key required',
+    description: 'Groq + Gemini embeddings - no API key required',
     requiresApiKey: null,
   },
   'local-llm': {
@@ -268,12 +268,6 @@ function getHeaders(): Record<string, string> {
       headers['X-TPM-Limit'] = getTpmLimit().toString()
     }
   }
-
-  // Legacy headers (kept for backwards compat during transition)
-  const provider = getProvider()
-  headers['X-LLM-Provider'] = provider
-  const geminiModel = getGeminiModel()
-  headers['X-Gemini-Model'] = geminiModel
 
   return headers
 }

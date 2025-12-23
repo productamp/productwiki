@@ -185,7 +185,7 @@ export default function RepoPage() {
                 </div>
               </div>
               <div className="text-sm text-muted-foreground space-y-1">
-                <p>{project.fileCount} files · {project.chunkCount} chunks · {project.embedding?.provider || 'unknown'}</p>
+                <p>{project.fileCount} files · {project.chunkCount} chunks · {project.embedding?.provider || 'unknown'} embeddings</p>
                 <p>Last indexed {timeAgo(new Date(project.indexedAt))}</p>
               </div>
             </Card>

@@ -165,7 +165,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                             {PRESETS['best-free-cloud'].description}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Uses Groq (Llama 4) + Jina AI embeddings
+                            Uses Groq (Llama 4) + Gemini embeddings
                           </p>
                         </div>
                       </div>

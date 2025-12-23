@@ -76,7 +76,6 @@ function createWikiHandler(type, generator) {
       preset: c.get('preset'),
       apiKeys: c.get('apiKeys'),
       groqApiKeys: c.get('groqApiKeys'),
-      jinaApiKey: c.get('jinaApiKey'),
       lowTpmMode: c.get('lowTpmMode'),
       tpmLimit: c.get('tpmLimit'),
     };

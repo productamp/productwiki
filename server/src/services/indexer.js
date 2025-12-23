@@ -3,7 +3,7 @@ import { writeFile } from 'fs/promises';
 import { config } from '../config/index.js';
 import { processRepository } from './repository.js';
 import { storeEmbeddings } from './vectorStore.js';
-import { embedBatch, embedBatchWithProgress } from '../providers/index.js';
+import { embedBatchWithProgress, resolvePreset } from '../providers/index.js';
 
 /**
  * Split text into words
@@ -134,18 +134,11 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
   await storeEmbeddings(owner, repo, allChunks);
   yield { phase: 'store', status: 'completed' };
 
-  // Determine embedding info for metadata
-  const provider = options.provider || config.llmProvider;
-  let embeddingModel;
-  let embeddingDimensions;
-
-  if (provider === 'ollama') {
-    embeddingModel = config.ollamaEmbeddingModel;
-    embeddingDimensions = config.ollamaEmbeddingDimensions;
-  } else {
-    embeddingModel = config.embeddingModel;
-    embeddingDimensions = config.embeddingDimensions;
-  }
+  // Determine embedding info from preset
+  const preset = resolvePreset(options);
+  const embeddingProvider = preset.embedding.provider;
+  const embeddingModel = preset.embedding.model;
+  const embeddingDimensions = preset.embedding.dimensions;
 
   // Save metadata with embedding info
   const metadata = {
@@ -157,10 +150,11 @@ export async function* indexRepositoryWithProgress(url, options = {}) {
     fileCount: files.length,
     chunkCount: allChunks.length,
     embedding: {
-      provider,
+      provider: embeddingProvider,
       model: embeddingModel,
       dimensions: embeddingDimensions,
     },
+    preset: preset.id,
   };
 
   const metaPath = join(config.metaDir, `${owner}_${repo}.json`);

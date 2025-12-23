@@ -38,11 +38,11 @@ export const PRESETS = {
   'best-free-cloud': {
     id: 'best-free-cloud',
     name: 'Best Free Cloud',
-    description: 'Groq + Jina - no API key required',
+    description: 'Groq + Gemini embeddings - no API key required',
     embedding: {
-      provider: 'jina',
-      model: 'jina-code-embeddings-0.5b',
-      dimensions: 896,
+      provider: 'gemini',
+      model: 'text-embedding-004',
+      dimensions: 768,
     },
     generation: {
       provider: 'groq',

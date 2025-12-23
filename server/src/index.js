@@ -22,7 +22,8 @@ app.use('*', cors());
 // Extract preset and API keys from headers into context
 app.use('*', async (c, next) => {
   // Preset (new system)
-  c.set('preset', c.req.header('x-preset') || null);
+  const presetHeader = c.req.header('x-preset');
+  c.set('preset', presetHeader || null);
 
   // Google API keys (for gemini/gemma presets)
   const apiKeysHeader = c.req.header('x-api-keys');
@@ -55,13 +56,6 @@ app.use('*', async (c, next) => {
     }
   }
   c.set('groqApiKeys', groqApiKeys);
-
-  // Jina API key (for best-free-cloud preset, optional - server has fallback)
-  c.set('jinaApiKey', c.req.header('x-jina-api-key') || null);
-
-  // Legacy fields (kept for backwards compat)
-  c.set('llmProvider', c.req.header('x-llm-provider'));
-  c.set('geminiModel', c.req.header('x-gemini-model'));
 
   // TPM rate limit settings (for gemini/gemma presets)
   c.set('lowTpmMode', c.req.header('x-low-tpm-mode') === 'true');

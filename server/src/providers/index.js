@@ -1,11 +1,9 @@
-import { config } from '../config/index.js';
 import { getPreset, DEFAULT_PRESET } from '../config/presets.js';
 import * as geminiLlm from './llm.js';
 import * as geminiEmbeddings from './embeddings.js';
 import * as ollamaLlm from './ollama-llm.js';
 import * as ollamaEmbeddings from './ollama-embeddings.js';
 import * as groqLlm from './groq-llm.js';
-import * as jinaEmbeddings from './jina-embeddings.js';
 
 /**
  * Get the LLM provider module based on provider name
@@ -26,9 +24,6 @@ export function getLlmProvider(provider) {
 export function getEmbeddingsProvider(provider) {
   if (provider === 'ollama') {
     return ollamaEmbeddings;
-  }
-  if (provider === 'jina') {
-    return jinaEmbeddings;
   }
   return geminiEmbeddings;
 }
@@ -77,7 +72,7 @@ export async function* streamChat(systemPrompt, messages, options = {}) {
  * Embed text using the preset's embedding provider
  */
 export async function embed(text, options = {}) {
-  const { apiKeys, jinaApiKey } = options;
+  const { apiKeys } = options;
   const preset = resolvePreset(options);
   const embeddingProvider = preset.embedding.provider;
 
@@ -85,9 +80,6 @@ export async function embed(text, options = {}) {
 
   if (embeddingProvider === 'ollama') {
     return embeddingsModule.embed(text);
-  }
-  if (embeddingProvider === 'jina') {
-    return embeddingsModule.embed(text, jinaApiKey);
   }
   // Gemini
   return embeddingsModule.embed(text, apiKeys);
@@ -97,7 +89,7 @@ export async function embed(text, options = {}) {
  * Batch embed texts using the preset's embedding provider
  */
 export async function embedBatch(texts, options = {}) {
-  const { apiKeys, jinaApiKey } = options;
+  const { apiKeys } = options;
   const preset = resolvePreset(options);
   const embeddingProvider = preset.embedding.provider;
 
@@ -105,9 +97,6 @@ export async function embedBatch(texts, options = {}) {
 
   if (embeddingProvider === 'ollama') {
     return embeddingsModule.embedBatch(texts);
-  }
-  if (embeddingProvider === 'jina') {
-    return embeddingsModule.embedBatch(texts, jinaApiKey);
   }
   // Gemini
   return embeddingsModule.embedBatch(texts, apiKeys);
@@ -118,7 +107,7 @@ export async function embedBatch(texts, options = {}) {
  * Returns an async generator that yields { current, total } progress events
  */
 export async function* embedBatchWithProgress(texts, options = {}) {
-  const { apiKeys, jinaApiKey, signal } = options;
+  const { apiKeys, signal } = options;
   const preset = resolvePreset(options);
   const embeddingProvider = preset.embedding.provider;
 
@@ -128,9 +117,6 @@ export async function* embedBatchWithProgress(texts, options = {}) {
 
   if (embeddingProvider === 'ollama') {
     return yield* embeddingsModule.embedBatchWithProgress(texts, signal);
-  }
-  if (embeddingProvider === 'jina') {
-    return yield* embeddingsModule.embedBatchWithProgress(texts, jinaApiKey, signal);
   }
   // Gemini
   return yield* embeddingsModule.embedBatchWithProgress(texts, apiKeys, signal);

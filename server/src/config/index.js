@@ -155,9 +155,6 @@ export const config = {
   groqApiKeys: parseApiKeys(process.env.GROQ_API_KEYS) ||
     (process.env.GROQ_API_KEY ? [{ key: process.env.GROQ_API_KEY, label: 'Default' }] : []),
 
-  // Jina AI settings (fallback key for 'best-free-cloud' preset)
-  jinaApiKey: process.env.JINA_API_KEY || null,
-
   // Server
   port: 3847,
 };

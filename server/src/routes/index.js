@@ -26,7 +26,6 @@ indexRoutes.post('/index', async (c) => {
         preset: c.get('preset'),
         apiKeys: c.get('apiKeys'),
         groqApiKeys: c.get('groqApiKeys'),
-        jinaApiKey: c.get('jinaApiKey'),
         signal: abortSignal,
       };
 
