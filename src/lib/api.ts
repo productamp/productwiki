@@ -165,7 +165,9 @@ export function setPlusAccessCode(code: string): boolean {
 }
 
 export function getLowTpmMode(): boolean {
-  return localStorage.getItem(LOW_TPM_MODE_KEY) === 'true'
+  const stored = localStorage.getItem(LOW_TPM_MODE_KEY)
+  // Default to true (enabled) if not set
+  return stored === null ? true : stored === 'true'
 }
 
 export function setLowTpmMode(enabled: boolean): void {
