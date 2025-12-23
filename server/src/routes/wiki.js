@@ -76,6 +76,8 @@ function createWikiHandler(type, generator) {
       apiKeys: c.get('apiKeys'),
       provider: c.get('llmProvider'),
       model: c.get('geminiModel'),
+      lowTpmMode: c.get('lowTpmMode'),
+      tpmLimit: c.get('tpmLimit'),
     };
 
     // Start generation in background

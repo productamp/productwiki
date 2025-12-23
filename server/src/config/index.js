@@ -1,6 +1,42 @@
 import { homedir } from 'os';
 import { join } from 'path';
 
+/**
+ * Parse API keys from environment variable
+ * Supports: JSON array of {key, label} or comma-separated "label:key" pairs
+ */
+function parseApiKeys(envValue) {
+  if (!envValue) return null;
+
+  // Try JSON first
+  try {
+    const parsed = JSON.parse(envValue);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item, i) => {
+        if (typeof item === 'string') {
+          return { key: item, label: `Key ${i + 1}` };
+        }
+        return { key: item.key, label: item.label || `Key ${i + 1}` };
+      });
+    }
+  } catch {
+    // Not JSON, try comma-separated format: "label:key,label:key"
+  }
+
+  // Parse comma-separated format: "label:key,label:key" or just "key,key"
+  return envValue.split(',').map((part, i) => {
+    const trimmed = part.trim();
+    const colonIndex = trimmed.indexOf(':');
+    if (colonIndex > 0 && colonIndex < trimmed.length - 1) {
+      return {
+        label: trimmed.substring(0, colonIndex),
+        key: trimmed.substring(colonIndex + 1),
+      };
+    }
+    return { key: trimmed, label: `Key ${i + 1}` };
+  }).filter(entry => entry.key);
+}
+
 export const config = {
   // Chunking settings
   chunkSize: 350,
@@ -103,6 +139,11 @@ export const config = {
 
   // Provider selection: 'gemini' or 'ollama'
   llmProvider: process.env.LLM_PROVIDER || 'gemini',
+
+  // Server-side API keys (used as fallback when user doesn't provide keys)
+  // Format: JSON array of {key, label} objects or comma-separated keys
+  googleApiKeys: parseApiKeys(process.env.GOOGLE_API_KEYS) ||
+    (process.env.GOOGLE_API_KEY ? [{ key: process.env.GOOGLE_API_KEY, label: 'Default' }] : []),
 
   // Ollama settings (OLLAMA_HOST is the standard env var used by Ollama CLI)
   ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:11434',

@@ -32,13 +32,13 @@ export function getEmbeddingsProvider(provider) {
  * Stream chat using the configured or specified provider
  */
 export async function* streamChat(systemPrompt, messages, options = {}) {
-  const { provider, apiKeys, model } = options;
+  const { provider, apiKeys, model, lowTpmMode, tpmLimit } = options;
   const llmProvider = getLlmProvider(provider);
 
   if (provider === 'ollama' || (!provider && config.llmProvider === 'ollama')) {
     yield* llmProvider.streamChat(systemPrompt, messages);
   } else {
-    yield* llmProvider.streamChat(systemPrompt, messages, apiKeys, model);
+    yield* llmProvider.streamChat(systemPrompt, messages, apiKeys, model, { lowTpmMode, tpmLimit });
   }
 }
 

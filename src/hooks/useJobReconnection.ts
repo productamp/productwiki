@@ -69,14 +69,19 @@ export function useWikiJobReconnection({
   generator,
   processEvent,
   enabled,
+  toastId,
+  setLoadingToast,
+  dismissToast,
 }: {
   jobId: string
   generator: () => AsyncGenerator<WikiEvent>
   processEvent: (event: WikiEvent, pageIdRef: { value: string }, contentRef: { value: string }) => void
   enabled: boolean
+  toastId?: string
+  setLoadingToast?: (id: string, message: string) => void
+  dismissToast?: (id: string) => void
 }) {
   const [reconnecting, setReconnecting] = useState(false)
-  const [status, setStatus] = useState('')
   const hasCheckedRef = useRef(false)
 
   const reconnect = useCallback(async () => {
@@ -84,7 +89,9 @@ export function useWikiJobReconnection({
       const jobStatus = await getJobStatus(jobId)
       if (jobStatus.status === 'running') {
         setReconnecting(true)
-        setStatus('Reconnecting to generation...')
+        if (toastId && setLoadingToast) {
+          setLoadingToast(toastId, 'Reconnecting to generation...')
+        }
 
         const currentPageIdRef = { value: '' }
         const currentContentRef = { value: '' }
@@ -95,13 +102,15 @@ export function useWikiJobReconnection({
           }
         } finally {
           setReconnecting(false)
-          setStatus('')
+          if (toastId && dismissToast) {
+            dismissToast(toastId)
+          }
         }
       }
     } catch {
       // Job status check failed, ignore
     }
-  }, [jobId, generator, processEvent])
+  }, [jobId, generator, processEvent, toastId, setLoadingToast, dismissToast])
 
   useEffect(() => {
     if (!enabled || hasCheckedRef.current) return
@@ -114,5 +123,5 @@ export function useWikiJobReconnection({
     hasCheckedRef.current = false
   }, [jobId])
 
-  return { reconnecting, status, reconnect }
+  return { reconnecting, reconnect }
 }

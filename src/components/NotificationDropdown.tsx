@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bell, AlertCircle, AlertTriangle, Info, CheckCircle, X, Trash2 } from 'lucide-react'
+import { Bell, AlertCircle, AlertTriangle, Info, CheckCircle, X, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -32,6 +32,11 @@ const typeConfig: Record<
     icon: CheckCircle,
     color: 'text-green-600',
     bg: 'bg-green-500/10',
+  },
+  loading: {
+    icon: Loader2,
+    color: 'text-foreground',
+    bg: 'bg-muted',
   },
 }
 

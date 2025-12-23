@@ -50,24 +50,24 @@ function isNetworkError(err) {
  * Get embedding model for a specific API key
  */
 function getClient(apiKey) {
-  const key = apiKey || process.env.GOOGLE_API_KEY;
-  if (!key) {
-    throw new Error('Google API key is required. Set it in Settings or GOOGLE_API_KEY environment variable.');
+  if (!apiKey) {
+    throw new Error('Google API key is required.');
   }
-  const genAI = new GoogleGenerativeAI(key);
+  const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({ model: config.embeddingModel });
 }
 
 /**
- * Normalize API keys to array with env fallback
+ * Normalize API keys to array with server-side fallback
  */
 function normalizeKeys(apiKeys) {
   const keys = Array.isArray(apiKeys) ? apiKeys : [apiKeys].filter(Boolean);
-  if (keys.length === 0 && process.env.GOOGLE_API_KEY) {
-    keys.push(process.env.GOOGLE_API_KEY);
+  // Add server-side keys as fallback if no user keys provided
+  if (keys.length === 0 && config.googleApiKeys.length > 0) {
+    keys.push(...config.googleApiKeys);
   }
   if (keys.length === 0) {
-    throw new Error('Google API key is required. Set it in Settings or GOOGLE_API_KEY environment variable.');
+    throw new Error('Google API key is required. Set it in Settings or GOOGLE_API_KEYS environment variable.');
   }
   return keys;
 }

@@ -9,23 +9,44 @@ import { embed } from '../providers/index.js';
 import { searchSimilar, isIndexed } from './vectorStore.js';
 
 /**
- * Maximum total characters for RAG context
+ * Standard RAG limits
  */
-export const MAX_RAG_CONTEXT_CHARS = 30000;
+const STANDARD_RAG_LIMITS = {
+  MAX_CHARS: 30000,
+  CHUNK_LIMIT: 20,
+};
 
 /**
- * Default number of chunks to retrieve from RAG
+ * Conservative RAG limits (for low TPM)
  */
-export const DEFAULT_CHUNK_LIMIT = 20;
+const CONSERVATIVE_RAG_LIMITS = {
+  MAX_CHARS: 15000,
+  CHUNK_LIMIT: 10,
+};
+
+/**
+ * Get RAG limits based on TPM mode
+ * @param {Object} options - Options including lowTpmMode
+ * @returns {Object} Limits object with MAX_CHARS and CHUNK_LIMIT
+ */
+export function getRagLimits(options = {}) {
+  return options.lowTpmMode ? CONSERVATIVE_RAG_LIMITS : STANDARD_RAG_LIMITS;
+}
+
+// Keep exports for backward compatibility
+export const MAX_RAG_CONTEXT_CHARS = STANDARD_RAG_LIMITS.MAX_CHARS;
+export const DEFAULT_CHUNK_LIMIT = STANDARD_RAG_LIMITS.CHUNK_LIMIT;
 
 /**
  * Build context string from RAG chunks
  * Groups chunks by file path for better organization
  * @param {Array} chunks - Array of chunks from RAG search
- * @param {number} maxChars - Maximum characters for context
+ * @param {Object} options - Options including lowTpmMode for conservative limits
  * @returns {string} Formatted context string
  */
-export function buildRagContext(chunks, maxChars = MAX_RAG_CONTEXT_CHARS) {
+export function buildRagContext(chunks, options = {}) {
+  const limits = getRagLimits(options);
+  const maxChars = limits.MAX_CHARS;
   // Group chunks by file path
   const byPath = new Map();
   for (const chunk of chunks) {

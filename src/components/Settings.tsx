@@ -6,7 +6,7 @@ import {
   DialogContent,
 } from '@/components/ui/dialog'
 import { Settings as SettingsIcon, Check, Plus, X, Crown, Package, RefreshCw, BookOpen } from 'lucide-react'
-import { getApiKeyEntries, setApiKeyEntries, getProvider, setProvider, getGeminiModel, setGeminiModel, isPlusUser, setPlusAccessCode, DEFAULT_GEMINI_MODEL, type LlmProvider, type ApiKeyEntry } from '@/lib/api'
+import { getApiKeyEntries, setApiKeyEntries, getProvider, setProvider, getGeminiModel, setGeminiModel, isPlusUser, setPlusAccessCode, getLowTpmMode, setLowTpmMode as setLowTpmModeStorage, getTpmLimit, setTpmLimit as setTpmLimitStorage, DEFAULT_GEMINI_MODEL, type LlmProvider, type ApiKeyEntry } from '@/lib/api'
 
 interface SettingsProps {
   open: boolean
@@ -22,6 +22,8 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
   const [geminiModel, setGeminiModelState] = useState(DEFAULT_GEMINI_MODEL)
   const [plusAccessCode, setPlusAccessCodeState] = useState('')
   const [isPlusActive, setIsPlusActive] = useState(false)
+  const [lowTpmMode, setLowTpmMode] = useState(false)
+  const [tpmLimit, setTpmLimit] = useState(15000)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -31,6 +33,8 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
       setProviderState(getProvider())
       setGeminiModelState(getGeminiModel())
       setIsPlusActive(isPlusUser())
+      setLowTpmMode(getLowTpmMode())
+      setTpmLimit(getTpmLimit())
       setPlusAccessCodeState('')
       setSaved(false)
       setActiveTab('ai-providers')
@@ -48,16 +52,25 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
     setApiKeyEntries(filtered)
     setProvider(provider)
     setGeminiModel(geminiModel)
+    setLowTpmModeStorage(lowTpmMode)
+    setTpmLimitStorage(tpmLimit)
 
     // Handle Plus access code
+    const wasPlusActive = isPlusActive
+    let nowPlusActive = wasPlusActive
     if (plusAccessCode.trim()) {
       const success = setPlusAccessCode(plusAccessCode.trim())
       setIsPlusActive(success)
+      nowPlusActive = success
     }
 
     setSaved(true)
     setTimeout(() => {
       onOpenChange(false)
+      // Refresh page if Plus status changed to show/hide Plus-only tools
+      if (nowPlusActive !== wasPlusActive) {
+        window.location.reload()
+      }
     }, 500)
   }
 
@@ -217,6 +230,36 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                         <p className="text-xs text-muted-foreground">
                           Default: {DEFAULT_GEMINI_MODEL}
                         </p>
+                      </div>
+                      <div className="space-y-2 pt-4 border-t">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium">Low TPM Mode</label>
+                          <Button
+                            variant={lowTpmMode ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setLowTpmMode(!lowTpmMode)}
+                          >
+                            {lowTpmMode ? 'Enabled' : 'Disabled'}
+                          </Button>
+                        </div>
+                        {lowTpmMode && (
+                          <div className="space-y-2 p-3 bg-muted rounded-md">
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-muted-foreground">TPM Limit:</label>
+                              <Input
+                                type="number"
+                                min={5000}
+                                max={100000}
+                                value={tpmLimit}
+                                onChange={(e) => setTpmLimit(parseInt(e.target.value) || 15000)}
+                                className="w-24 h-8"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Reduces context sizes and adds delays to stay within token limits. For Gemma-3-27b use 15000.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

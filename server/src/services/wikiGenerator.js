@@ -30,49 +30,62 @@ async function getReadmeContent(owner, repo, branch) {
 }
 
 /**
- * Number of chunks to retrieve from RAG for each wiki page
+ * Standard mode limits
  */
-const WIKI_CHUNK_LIMIT = 15;
+const STANDARD_LIMITS = {
+  MAX_FILE_TREE_CHARS: 10000,
+  WIKI_CHUNK_LIMIT: 15,
+  STRUCTURE_CHUNK_LIMIT: 10,
+};
+
+/**
+ * Conservative mode limits (for low TPM)
+ */
+const CONSERVATIVE_LIMITS = {
+  MAX_FILE_TREE_CHARS: 5000,
+  WIKI_CHUNK_LIMIT: 8,
+  STRUCTURE_CHUNK_LIMIT: 5,
+};
+
+/**
+ * Get limits based on TPM mode
+ */
+function getLimits(options) {
+  return options.lowTpmMode ? CONSERVATIVE_LIMITS : STANDARD_LIMITS;
+}
 
 /**
  * Get relevant chunks for a page using RAG vector search
  */
 async function getRelevantChunks(owner, repo, page, options = {}) {
+  const limits = getLimits(options);
   // Build search query from page title and description
   const searchQuery = `${page.title}. ${page.description || ''}`;
-  return queryRag(owner, repo, searchQuery, options, WIKI_CHUNK_LIMIT);
+  return queryRag(owner, repo, searchQuery, options, limits.WIKI_CHUNK_LIMIT);
 }
 
 /**
- * Maximum file tree size (in characters) to include in structure generation
- */
-const MAX_FILE_TREE_CHARS = 10000;
-
-/**
- * Maximum README size (in characters) to include in structure generation
- */
-const MAX_README_CHARS = 8000;
-
-/**
  * Generate wiki structure using LLM
- * Phase 1: Analyze file tree + README to determine optimal wiki structure
+ * Phase 1: Analyze file tree + RAG context to determine optimal wiki structure
  */
 async function generateWikiStructure(owner, repo, branch, isComprehensive, options = {}) {
+  const limits = getLimits(options);
   const { fileTree: rawFileTree, files } = await getFileTree(owner, repo, branch);
   let fileTree = rawFileTree;
-  let readme = await getReadmeContent(owner, repo, branch);
 
-  // Truncate if too long to prevent rate limits
-  if (fileTree.length > MAX_FILE_TREE_CHARS) {
-    fileTree = fileTree.slice(0, MAX_FILE_TREE_CHARS) + '\n... [truncated]';
-    console.log(`[Wiki] File tree truncated from ${fileTree.length} to ${MAX_FILE_TREE_CHARS} chars`);
-  }
-  if (readme.length > MAX_README_CHARS) {
-    readme = readme.slice(0, MAX_README_CHARS) + '\n... [truncated]';
-    console.log(`[Wiki] README truncated from ${readme.length} to ${MAX_README_CHARS} chars`);
+  // Truncate file tree if too long
+  if (fileTree.length > limits.MAX_FILE_TREE_CHARS) {
+    fileTree = fileTree.slice(0, limits.MAX_FILE_TREE_CHARS) + '\n... [truncated]';
+    console.log(`[Wiki] File tree truncated to ${limits.MAX_FILE_TREE_CHARS} chars (mode: ${options.lowTpmMode ? 'conservative' : 'standard'})`);
   }
 
-  const prompt = getStructureGenerationPrompt(owner, repo, fileTree, readme, isComprehensive);
+  // Use RAG to get project overview instead of raw README
+  const overviewQuery = 'project overview purpose features architecture getting started README';
+  const overviewChunks = await queryRag(owner, repo, overviewQuery, options, limits.STRUCTURE_CHUNK_LIMIT);
+  const overviewContext = buildRagContext(overviewChunks, options);
+  console.log(`[Wiki] Structure using RAG context: ${overviewChunks.length} chunks, ${overviewContext.length} chars`);
+
+  const prompt = getStructureGenerationPrompt(owner, repo, fileTree, overviewContext, isComprehensive);
   console.log(`[Wiki] Structure prompt size: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
 
   const messages = [
@@ -118,24 +131,26 @@ async function generateWikiStructure(owner, repo, branch, isComprehensive, optio
 
 /**
  * Generate product documentation structure using LLM
- * Phase 1: Analyze file tree + README to determine user-focused documentation structure
+ * Phase 1: Analyze file tree + RAG context to determine user-focused documentation structure
  */
 async function generateProductDocsStructure(owner, repo, branch, options = {}) {
+  const limits = getLimits(options);
   const { fileTree: rawFileTree, files } = await getFileTree(owner, repo, branch);
   let fileTree = rawFileTree;
-  let readme = await getReadmeContent(owner, repo, branch);
 
-  // Truncate if too long to prevent rate limits
-  if (fileTree.length > MAX_FILE_TREE_CHARS) {
-    fileTree = fileTree.slice(0, MAX_FILE_TREE_CHARS) + '\n... [truncated]';
-    console.log(`[ProductDocs] File tree truncated from ${fileTree.length} to ${MAX_FILE_TREE_CHARS} chars`);
-  }
-  if (readme.length > MAX_README_CHARS) {
-    readme = readme.slice(0, MAX_README_CHARS) + '\n... [truncated]';
-    console.log(`[ProductDocs] README truncated from ${readme.length} to ${MAX_README_CHARS} chars`);
+  // Truncate file tree if too long
+  if (fileTree.length > limits.MAX_FILE_TREE_CHARS) {
+    fileTree = fileTree.slice(0, limits.MAX_FILE_TREE_CHARS) + '\n... [truncated]';
+    console.log(`[ProductDocs] File tree truncated to ${limits.MAX_FILE_TREE_CHARS} chars (mode: ${options.lowTpmMode ? 'conservative' : 'standard'})`);
   }
 
-  const prompt = getProductDocsStructurePrompt(owner, repo, fileTree, readme);
+  // Use RAG to get project overview instead of raw README
+  const overviewQuery = 'product features user guide getting started usage documentation README';
+  const overviewChunks = await queryRag(owner, repo, overviewQuery, options, limits.STRUCTURE_CHUNK_LIMIT);
+  const overviewContext = buildRagContext(overviewChunks, options);
+  console.log(`[ProductDocs] Structure using RAG context: ${overviewChunks.length} chunks, ${overviewContext.length} chars`);
+
+  const prompt = getProductDocsStructurePrompt(owner, repo, fileTree, overviewContext);
   console.log(`[ProductDocs] Structure prompt size: ${prompt.length} chars (~${Math.ceil(prompt.length / 4)} tokens)`);
 
   const messages = [

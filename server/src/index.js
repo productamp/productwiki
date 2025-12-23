@@ -42,6 +42,9 @@ app.use('*', async (c, next) => {
   c.set('apiKey', apiKeys[0] || null); // Keep for backwards compat
   c.set('llmProvider', c.req.header('x-llm-provider'));
   c.set('geminiModel', c.req.header('x-gemini-model'));
+  // TPM rate limit settings
+  c.set('lowTpmMode', c.req.header('x-low-tpm-mode') === 'true');
+  c.set('tpmLimit', parseInt(c.req.header('x-tpm-limit') || '0', 10) || 15000);
   await next();
 });
 
