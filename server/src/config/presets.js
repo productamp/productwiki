@@ -19,25 +19,9 @@ export const PRESETS = {
     requiresApiKey: 'google',
   },
 
-  'gemma-cloud': {
-    id: 'gemma-cloud',
-    name: 'Gemma Cloud',
-    description: 'Google Gemma 3 27B - open model on Google infrastructure',
-    embedding: {
-      provider: 'gemini',
-      model: 'text-embedding-004',
-      dimensions: 768,
-    },
-    generation: {
-      provider: 'gemini',
-      model: 'gemma-3-27b-it',
-    },
-    requiresApiKey: 'google',
-  },
-
-  'best-free-cloud': {
-    id: 'best-free-cloud',
-    name: 'Best Free Cloud',
+  'groq-cloud': {
+    id: 'groq-cloud',
+    name: 'Groq Cloud',
     description: 'Groq + Gemini embeddings - no API key required',
     embedding: {
       provider: 'gemini',
@@ -71,7 +55,7 @@ export const PRESETS = {
 /**
  * Default preset when none is specified
  */
-export const DEFAULT_PRESET = 'best-free-cloud';
+export const DEFAULT_PRESET = 'groq-cloud';
 
 /**
  * Get preset configuration by ID

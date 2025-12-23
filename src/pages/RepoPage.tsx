@@ -171,7 +171,7 @@ export default function RepoPage() {
                       </Button>
                     </a>
                   )}
-                  {project.url && (
+                  {project.url && !project.url.startsWith('local://') && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -233,10 +233,11 @@ export default function RepoPage() {
         )}
       </div>
 
-      {/* Re-index Dialog */}
-      {project?.url && (
+      {/* Re-index Dialog - only for GitHub projects */}
+      {project?.url && !project.url.startsWith('local://') && (
         <IndexingDialog
           open={showReindexDialog}
+          mode="github"
           url={project.url}
           onComplete={handleReindexComplete}
           onCancel={handleReindexCancel}

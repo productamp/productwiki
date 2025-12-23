@@ -15,7 +15,7 @@ function splitIntoWords(text) {
 /**
  * Chunk a document into overlapping pieces
  */
-function chunkDocument(doc) {
+export function chunkDocument(doc) {
   const words = splitIntoWords(doc.content);
   const chunks = [];
 

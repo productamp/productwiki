@@ -6,12 +6,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Check, Loader2, Circle, X } from 'lucide-react'
-import { indexRepoStream, type IndexProgress, type ProjectMetadata } from '@/lib/api'
+import { Check, Loader2, Circle } from 'lucide-react'
+import {
+  indexRepoStream,
+  indexLocalStream,
+  type IndexProgress,
+  type ProjectMetadata,
+  type LocalFileData,
+} from '@/lib/api'
+
+export type IndexingMode = 'github' | 'local'
 
 interface IndexingDialogProps {
   open: boolean
+  mode: IndexingMode
   url: string
+  projectName?: string
+  localFiles?: LocalFileData[]
   onComplete: (metadata: ProjectMetadata) => void
   onCancel: () => void
   onError: (error: string) => void
@@ -26,28 +37,45 @@ interface Step {
   detail?: string
 }
 
+const GITHUB_STEPS: Step[] = [
+  { id: 'clone', label: 'Cloning repository', status: 'pending' },
+  { id: 'extract', label: 'Extracting files', status: 'pending' },
+  { id: 'chunk', label: 'Chunking documents', status: 'pending' },
+  { id: 'embed', label: 'Embedding chunks', status: 'pending' },
+  { id: 'store', label: 'Storing in database', status: 'pending' },
+]
+
+const LOCAL_STEPS: Step[] = [
+  { id: 'clone', label: 'Uploading files', status: 'pending' },
+  { id: 'extract', label: 'Processing files', status: 'pending' },
+  { id: 'chunk', label: 'Chunking documents', status: 'pending' },
+  { id: 'embed', label: 'Embedding chunks', status: 'pending' },
+  { id: 'store', label: 'Storing in database', status: 'pending' },
+]
+
 export function IndexingDialog({
   open,
+  mode,
   url,
+  projectName,
+  localFiles,
   onComplete,
   onCancel,
   onError,
 }: IndexingDialogProps) {
-  const [steps, setSteps] = useState<Step[]>([
-    { id: 'clone', label: 'Cloning repository', status: 'pending' },
-    { id: 'extract', label: 'Extracting files', status: 'pending' },
-    { id: 'chunk', label: 'Chunking documents', status: 'pending' },
-    { id: 'embed', label: 'Embedding chunks', status: 'pending' },
-    { id: 'store', label: 'Storing in database', status: 'pending' },
-  ])
+  const initialSteps = mode === 'local' ? LOCAL_STEPS : GITHUB_STEPS
+  const [steps, setSteps] = useState<Step[]>(initialSteps)
   const [embedProgress, setEmbedProgress] = useState({ current: 0, total: 0 })
   const [elapsedTime, setElapsedTime] = useState(0)
   const [isCancelling, setIsCancelling] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const startTimeRef = useRef<number>(Date.now())
 
-  // Parse owner/repo from URL for display
-  const getRepoName = (url: string) => {
+  // Get display name based on mode
+  const getDisplayName = () => {
+    if (mode === 'local') {
+      return `local/${projectName || 'unknown'}`
+    }
     const match = url.match(/github\.com\/([^/]+\/[^/]+)/)
     return match ? match[1] : url
   }
@@ -55,14 +83,9 @@ export function IndexingDialog({
   useEffect(() => {
     if (!open) return
 
-    // Reset state
-    setSteps([
-      { id: 'clone', label: 'Cloning repository', status: 'pending' },
-      { id: 'extract', label: 'Extracting files', status: 'pending' },
-      { id: 'chunk', label: 'Chunking documents', status: 'pending' },
-      { id: 'embed', label: 'Embedding chunks', status: 'pending' },
-      { id: 'store', label: 'Storing in database', status: 'pending' },
-    ])
+    // Reset state with mode-appropriate steps
+    const stepsForMode = mode === 'local' ? LOCAL_STEPS : GITHUB_STEPS
+    setSteps(stepsForMode.map(s => ({ ...s })))
     setEmbedProgress({ current: 0, total: 0 })
     setElapsedTime(0)
     setIsCancelling(false)
@@ -77,7 +100,10 @@ export function IndexingDialog({
     abortControllerRef.current = new AbortController()
     const runIndexing = async () => {
       try {
-        const generator = indexRepoStream(url, abortControllerRef.current?.signal)
+        const signal = abortControllerRef.current?.signal
+        const generator = mode === 'local' && projectName && localFiles
+          ? indexLocalStream(projectName, localFiles, signal)
+          : indexRepoStream(url, signal)
 
         for await (const event of generator) {
           handleProgressEvent(event)
@@ -86,7 +112,10 @@ export function IndexingDialog({
         if (err instanceof Error && err.name === 'AbortError') {
           // User cancelled - handled in handleCancel
         } else {
-          onError(err instanceof Error ? err.message : 'Failed to index repository')
+          const errorMsg = mode === 'local'
+            ? 'Failed to index local directory'
+            : 'Failed to index repository'
+          onError(err instanceof Error ? err.message : errorMsg)
         }
       }
     }
@@ -97,7 +126,7 @@ export function IndexingDialog({
       clearInterval(timer)
       abortControllerRef.current?.abort()
     }
-  }, [open, url])
+  }, [open, mode, url, projectName, localFiles])
 
   const handleProgressEvent = (event: IndexProgress) => {
     switch (event.phase) {
@@ -187,24 +216,11 @@ export function IndexingDialog({
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>Indexing Repository</DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancel}
-              disabled={isCancelling}
-            >
-              {isCancelling ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <X className="h-4 w-4" />
-              )}
-              <span className="ml-1">{isCancelling ? 'Cancelling...' : 'Cancel'}</span>
-            </Button>
-          </div>
+          <DialogTitle>
+            {mode === 'local' ? 'Indexing Local Directory' : 'Indexing Repository'}
+          </DialogTitle>
           <p className="text-sm text-muted-foreground font-mono">
-            {getRepoName(url)}
+            {getDisplayName()}
           </p>
         </DialogHeader>
 
@@ -250,6 +266,23 @@ export function IndexingDialog({
 
         <div className="mt-4 text-sm text-muted-foreground">
           Elapsed: {formatTime(elapsedTime)}
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button
+            variant="outline"
+            onClick={handleCancel}
+            disabled={isCancelling}
+          >
+            {isCancelling ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Cancelling...
+              </>
+            ) : (
+              'Cancel'
+            )}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
